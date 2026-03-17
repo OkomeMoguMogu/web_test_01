@@ -3,9 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <title>My Game Portfolio</title>
+    <style>
+        /* プルプル動くアニメーションの定義 */
+        @keyframes purupuru {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            25% { transform: translate(2px, -2px) rotate(1deg); }
+            50% { transform: translate(-2px, 2px) rotate(-1deg); }
+            75% { transform: translate(2px, 2px) rotate(1deg); }
+            100% { transform: translate(0, 0) rotate(0deg); }
+        }
+
+        /* クリックした時にこのクラス（命令）を付ける */
+        .shake-animation {
+            display: inline-block; /* アニメーションさせるために必要 */
+            animation: purupuru 0.2s ease infinite; /* 0.2秒でループ */
+            color: #ff0055; /* 色を変えると分かりやすい */
+        }
+
+        h1 {
+            cursor: pointer; /* マウスを乗せると指マークになる */
+            user-select: none; /* テキスト選択されないようにする（ゲームっぽい） */
+        }
+    </style>
 </head>
 <body>
-    <h1>テストページ公開成功！</h1>
-    <p>ここからGameMakerの作品を載せていくぞ。</p>
+
+    <h1 id="target-text">ここをクリックして！</h1>
+
+    <script>
+        const text = document.getElementById('target-text');
+
+        // クリックした時の処理
+        text.addEventListener('click', () => {
+            // クラスを付け外しする（GameMakerの変数を切り替える感じ）
+            text.classList.toggle('shake-animation');
+        });
+    </script>
+
 </body>
 </html>
