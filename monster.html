@@ -67,12 +67,11 @@
 
         function setup() {
             createCanvas(windowWidth, windowHeight);
-            if (windowWidth < 600) {
-                PIXEL_SCALE = 2;
-            } else {
-                PIXEL_SCALE = 4;
-            }
-            // ↓ 【追加】スマホの「勝手に高画質化（巨大化）する機能」をオフにする
+
+            // Adjust PIXEL_SCALE automatically so the screen width stays around 400-500 logical pixels
+            PIXEL_SCALE = Math.max(1, Math.round(windowWidth / 480));
+
+            // スマホの「勝手に高画質化（巨大化）する機能」をオフにする
             pixelDensity(1);
             noSmooth();
             imageMode(CENTER);
@@ -214,12 +213,15 @@
         function mousePressed() {
             if (bgm && !isBgmStarted) {
                 isBgmStarted = true;
+                bgm.playMode('restart'); // Ensure it doesn't overlap old playback
                 bgm.setVolume(0.5);
                 bgm.loop();
 
                 let savedTime = sessionStorage.getItem('bgmTime');
                 if (savedTime) {
-                    bgm.jump(parseFloat(savedTime));
+                    setTimeout(() => {
+                        bgm.jump(parseFloat(savedTime));
+                    }, 10);
                     sessionStorage.removeItem('bgmTime');
                 }
             }
@@ -419,12 +421,10 @@
         }
 
         function windowResized() {
-            if (windowWidth < 600) {
-                PIXEL_SCALE = 2;
-            } else {
-                PIXEL_SCALE = 4;
-            }
             resizeCanvas(windowWidth, windowHeight);
+            PIXEL_SCALE = Math.max(1, Math.round(windowWidth / 480));
+            pixelDensity(1);
+            noSmooth(); // MUST re-add after resize or context is lost!
         }
     </script>
 </body>
