@@ -4,116 +4,66 @@
     <meta charset="UTF-8">
     <title>My Game Portfolio</title>
     <style>
-        /* 1. 全体の設定（黒基調、ど真ん中に配置） */
+        /* Webページの余白をなくし、スクロールバーを出さないようにする */
         body {
-            background-color: #111; /* 背景を黒に */
-            color: #fff; /* 文字を白に */
-            display: flex;
-            justify-content: center; /* 横方向の中心 */
-            align-items: center; /* 縦方向の中心 */
-            height: 100vh; /* 画面いっぱいの高さ */
             margin: 0;
-            /* 丸っこくてかわいいフォントの指定 */
-            font-family: 'Zen Maru Gothic', 'Hiragino Maru Gothic ProN', 'M PLUS Rounded 1c', sans-serif;
+            padding: 0;
+            background-color: #111; /* 背景を黒に */
+            overflow: hidden;
         }
-
-        h1 {
-            /* 連続クリックしても文字が青く選択されないようにする強力なおまじない */
-            -webkit-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
-            
-            font-size: 1.5em; /* 文字サイズを元の2/3くらいに縮小（デフォルトは約2em） */
-            letter-spacing: 5px; /* 文字の間を5px離す */
-        }
-
-        /* 1文字ずつの基本スタイル */
-        .char {
-            display: inline-block;
-            cursor: pointer;
-            position: relative; /* ひび割れ線を描くための基準位置 */
-            
-            /* 【重要】アニメーションの支点を「下の中央」にする */
-            /* これにより、足元は固定され、頭の方が大きく揺れるようになります */
-            transform-origin: bottom center; 
-        }
-
-        /* 2. 頭が揺れるぷるんとしたアニメーション（縦には伸び縮みしない） */
-        @keyframes wobble {
-            0%   { transform: skewX(0deg); }
-            20%  { transform: skewX(-15deg); } /* 左に傾く */
-            40%  { transform: skewX(10deg); }  /* 右に傾く */
-            60%  { transform: skewX(-5deg); }
-            80%  { transform: skewX(2deg); }
-            100% { transform: skewX(0deg); }   /* すぐに収束 */
-        }
-
-        /* クリック時に付与する揺れクラス */
-        .jelly-active {
-            animation: wobble 0.35s ease-out both; 
-        }
-
-        /* 3. 3回クリックされた時のひび割れクラス */
-        .cracked {
-            opacity: 0.7; /* 少し暗くする */
-            transform: rotate(-3deg) translate(1px, 2px); /* ガクッとずれた感じを出す */
-        }
-        
-        /* ひび割れの「線」をCSSで作るトリック */
-        .cracked::after {
-            content: "";
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            /* 背景と同じ黒色（#111）の斜め線を文字の上に引き、割れ目を表現 */
-            background: linear-gradient(70deg, transparent 40%, #111 45%, #111 55%, transparent 60%);
-            pointer-events: none; /* 線がマウスクリックを邪魔しないようにする */
+        /* p5.jsが作るキャンバス（描画エリア）の線を消す */
+        canvas {
+            display: block;
         }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
 </head>
 <body>
 
-    <h1 id="target-text">ここをクリックして！</h1>
-
     <script>
-        const h1Element = document.getElementById('target-text');
-        const text = h1Element.textContent;
-        
-        h1Element.innerHTML = '';
+        // GameMakerの変数の定義と同じ
+        let x = 0;
+        let y = 0;
+        let currentSize = 50; // 現在のサイズ
+        const baseSize = 50;  // 基本のサイズ
 
-        for (let i = 0; i < text.length; i++) {
-            const char = text[i];
-            
-            const span = document.createElement('span');
-            span.textContent = char;
-            span.className = 'char';
-            
-            // 【追加】この文字が何回クリックされたかを記憶する変数
-            let clickCount = 0;
+        // 【Createイベント】最初に1回だけ呼ばれる
+        function setup() {
+            // 画面いっぱいのキャンバス（ルーム）を作成
+            createCanvas(windowWidth, windowHeight);
+            noStroke(); // 図形の枠線をオフにする
+        }
 
-            span.addEventListener('click', function() {
-                // すでにひび割れていたら、もう揺らさない（お好みで変更可）
-                if (this.classList.contains('cracked')) return;
+        // 【Step + Drawイベント】毎フレーム呼ばれる（基本60FPS）
+        function draw() {
+            // 1. 毎フレーム背景を黒（#111に近い色）で塗りつぶしてリセットする
+            background(17);
 
-                clickCount++; // クリック回数を1増やす
+            // 2. 状態の更新（Step処理）
+            // lerp（線形補間）を使って、現在の位置からマウスの位置へ徐々に近づける
+            // 最後の数字（0.15）をいじると、追従するスピードが変わります
+            x = lerp(x, mouseX, 0.15);
+            y = lerp(y, mouseY, 0.15);
 
-                if (clickCount >= 3) {
-                    // 3回クリックされたら：揺れを止めて、ひび割れクラスを付ける
-                    this.classList.remove('jelly-active');
-                    this.classList.add('cracked');
-                } else {
-                    // 1〜2回目のクリック：プルッと揺らす
-                    this.classList.remove('jelly-active');
-                    void this.offsetWidth; 
-                    this.classList.add('jelly-active');
-                }
-            });
+            // クリック中かどうかでサイズと色を変える（手触りの表現）
+            if (mouseIsPressed) {
+                // クリック中は少し潰れるようにサイズを大きくする
+                currentSize = lerp(currentSize, baseSize * 1.5, 0.2);
+                fill(255, 0, 85); // 赤色
+            } else {
+                // クリックを離すと元のサイズに戻る
+                currentSize = lerp(currentSize, baseSize, 0.2);
+                fill(255); // 白色
+            }
 
-            span.addEventListener('animationend', function() {
-                this.classList.remove('jelly-active');
-            });
+            // 3. 描画（Draw処理）
+            // 計算した x, y の位置に、計算した currentSize の大きさで円を描く
+            ellipse(x, y, currentSize, currentSize);
+        }
 
-            h1Element.appendChild(span);
+        // ウィンドウのサイズが変更された時にキャンバスのサイズも合わせる処理
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
         }
     </script>
 
