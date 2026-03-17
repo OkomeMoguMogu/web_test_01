@@ -52,10 +52,6 @@
 
         function setup() {
             createCanvas(windowWidth, windowHeight);
-            
-            // 【追加】どんなスマホでも絶対に1秒間に60コマで計算するように固定する（超重要）
-            frameRate(60);
-            
             if (windowWidth < 600) {
                 PIXEL_SCALE = 2;
             } else {
@@ -72,8 +68,8 @@
             if (sndIncorrect) sndIncorrect.setVolume(0.25);
             if (sndKirakira) sndKirakira.setVolume(0.25);
 
-            let logicalW = width / PIXEL_SCALE;
-            let logicalH = height / PIXEL_SCALE;
+            let logicalW = windowWidth / PIXEL_SCALE;
+            let logicalH = windowHeight / PIXEL_SCALE;
 
             if (playerImg) playerImg.pause();
 
@@ -108,8 +104,8 @@
             background(0);
             scale(PIXEL_SCALE);
 
-            let logicalW = width / PIXEL_SCALE;
-            let logicalH = height / PIXEL_SCALE;
+            let logicalW = windowWidth / PIXEL_SCALE;
+            let logicalH = windowHeight / PIXEL_SCALE;
             let centerX = logicalW / 2;
             let centerY = logicalH / 2;
 
@@ -248,8 +244,8 @@
                 wakeupTimer = 0;
                 if (sndKirakira) sndKirakira.play();
 
-                let logicalW = width / PIXEL_SCALE;
-                let logicalH = height / PIXEL_SCALE;
+                let logicalW = windowWidth / PIXEL_SCALE;
+                let logicalH = windowHeight / PIXEL_SCALE;
                 for (let i = 0; i < 150; i++) {
                     let px = random(logicalW);
                     let py = random(logicalH);
@@ -295,8 +291,8 @@
                     }
                 }
 
-                let logicalW = width / PIXEL_SCALE;
-                let logicalH = height / PIXEL_SCALE;
+                let logicalW = windowWidth / PIXEL_SCALE;
+                let logicalH = windowHeight / PIXEL_SCALE;
                 let margin = 8;
                 this.x = constrain(this.x, margin, logicalW - margin);
                 this.y = constrain(this.y, margin, logicalH - margin);
@@ -339,49 +335,49 @@
                     return;
                 }
 
-                let logicalW = width / PIXEL_SCALE;
-                let logicalH = height / PIXEL_SCALE;
+                let logicalW = windowWidth / PIXEL_SCALE;
+                let logicalH = windowHeight / PIXEL_SCALE;
                 let centerX = logicalW / 2;
                 let centerY = logicalH / 2;
 
+                // モンスターとの衝突
                 if (dist(this.x, this.y, centerX, centerY) < 25 && state === "sleep") {
                     if (monsterShakeTimer <= 0 && sndButukaru) {
                         sndButukaru.play();
                     }
                     monsterShakeTimer = 75;
                     let angle = atan2(this.y - centerY, this.x - centerX);
-                    this.vx = cos(angle) * 4;
-                    this.vy = sin(angle) * 4;
+                    this.vx = cos(angle) * 5;
+                    this.vy = sin(angle) * 5;
                 }
 
+                // 【修正】プレイヤーからの体当たり（ドリブルのように速度が加算される）
                 let d = dist(player.x, player.y, this.x, this.y);
                 let minDist = 24;
                 if (d < minDist) {
                     let angle = atan2(this.y - player.y, this.x - player.x);
-                    this.vx += cos(angle) * 1.5; 
+                    this.vx += cos(angle) * 1.5; // 速度を加える
                     this.vy += sin(angle) * 1.5;
                     this.isPushed = true;
                 } else {
                     this.isPushed = false;
                 }
 
-                // 【追加】念のため最高速度を制限（安全装置）
-                this.vx = constrain(this.vx, -15, 15);
-                this.vy = constrain(this.vy, -15, 15);
-
+                // 速度を実際の座標に適用
                 this.x += this.vx;
                 this.y += this.vy;
 
+                // 摩擦で減速
                 this.vx *= 0.85;
                 this.vy *= 0.85;
 
-                // 【修正】跳ね返りパワーを安全な値（-0.8）に変更
-                let margin = 12; 
-                let bouncePower = -0.8; 
+                // 【修正】壁でのバウンド処理
+                let margin = 12; // 文字の厚み
+                let bouncePower = -1.2; // -1.0より大きくするとボヨ〜ンと少し弾む
 
                 if (this.x < margin) {
                     this.x = margin;
-                    this.vx *= bouncePower; 
+                    this.vx *= bouncePower; // 勢いを反転して跳ね返す
                 } else if (this.x > logicalW - margin) {
                     this.x = logicalW - margin;
                     this.vx *= bouncePower;
@@ -395,10 +391,12 @@
                     this.vy *= bouncePower;
                 }
 
+                // スロットとの吸着判定
                 for (let s of slots) {
                     if (dist(this.x, this.y, s.x, s.y) < 10) {
                         if (this.char === s.expected && !s.filled) {
                             this.x = s.x; this.y = s.y;
+                            // 吸着したら速度をゼロにしてロック
                             this.vx = 0;
                             this.vy = 0;
                             this.isLocked = true;
