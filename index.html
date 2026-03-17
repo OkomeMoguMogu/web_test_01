@@ -7,7 +7,6 @@
     <style>
         body { margin: 0; padding: 0; background-color: #000; overflow: hidden; touch-action: none;}
         canvas { display: block; }
-        
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/addons/p5.sound.min.js"></script>
@@ -36,24 +35,25 @@
             flowerImg = loadImage('flower.gif');
             playerImg = loadImage('player.gif');
             bgm = loadSound('kataomoi.mp3'); 
-            sndFlower = loadSound('snd_flower.wav'); // 【修正】wavに変更
+            sndFlower = loadSound('snd_flower.wav'); 
         }
 
         function setup() {
             createCanvas(windowWidth, windowHeight);
             
-            // Adjust PIXEL_SCALE for smartphone portrait mode
             if (windowWidth < 600) {
                 PIXEL_SCALE = 2;
             } else {
                 PIXEL_SCALE = 4;
             }
 
-            // ↓ 【追加】スマホの「勝手に高画質化（巨大化）する機能」をオフにする
             pixelDensity(1);
             noSmooth(); 
             noStroke();
             imageMode(CENTER);
+
+            // 【追加】SEの音量を半分にする
+            if (sndFlower) sndFlower.setVolume(0.5);
 
             if (playerImg) playerImg.pause();
             
@@ -250,6 +250,8 @@
                     if (this.isPink && d < 10) {
                         if (bgm && bgm.isPlaying()) {
                             sessionStorage.setItem('bgmTime', bgm.currentTime());
+                            // 【修正】移動前に音を完全に止める（ゴーストオーディオ対策）
+                            bgm.stop(); 
                         }
                         window.location.href = 'monster.html';
                     }

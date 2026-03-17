@@ -1,31 +1,17 @@
 <!DOCTYPE html>
 <html lang="ja">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Wake Up!</title>
     <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #000;
-            overflow: hidden;
-            font-family: 'DotGothic16', sans-serif;
-            touch-action: none;
-        }
-
-        canvas {
-            display: block;
-            image-rendering: pixelated;
-            image-rendering: crisp-edges;
-        }
+        body { margin: 0; padding: 0; background-color: #000; overflow: hidden; font-family: 'DotGothic16', sans-serif; touch-action: none; }
+        canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/addons/p5.sound.min.js"></script>
 </head>
-
 <body>
     <script>
         let PIXEL_SCALE = 4;
@@ -57,8 +43,6 @@
             playerImg = loadImage('player.gif');
 
             bgm = loadSound('kataomoi.mp3');
-
-            // 【修正】すべてwavに変更
             sndButukaru = loadSound('snd_monster_butukaru.wav');
             sndCorrect = loadSound('snd_correct.wav');
             sndIncorrect = loadSound('snd_incorrect.wav');
@@ -72,12 +56,17 @@
             } else {
                 PIXEL_SCALE = 4;
             }
-            // ↓ 【追加】スマホの「勝手に高画質化（巨大化）する機能」をオフにする
             pixelDensity(1);
             noSmooth();
             imageMode(CENTER);
             textAlign(CENTER, CENTER);
             textFont('DotGothic16');
+
+            // 【追加】SEの音量をすべて半分にする
+            if (sndButukaru) sndButukaru.setVolume(0.5);
+            if (sndCorrect) sndCorrect.setVolume(0.5);
+            if (sndIncorrect) sndIncorrect.setVolume(0.5);
+            if (sndKirakira) sndKirakira.setVolume(0.5);
 
             let logicalW = windowWidth / PIXEL_SCALE;
             let logicalH = windowHeight / PIXEL_SCALE;
@@ -170,9 +159,18 @@
             }
             else if (state === "wakeup") {
                 push();
-                translate(centerX + random(-2, 2), centerY + random(-2, 2));
+                // 【修正】振動させないため、ズレを無くして中央に固定
+                translate(centerX, centerY);
                 if (imgWakeup) image(imgWakeup, 0, 0);
                 pop();
+
+                // 【修正】消えていたキラキラカラフルエフェクトを復活
+                if (wakeupTimer < 60) {
+                    for (let i = 0; i < 40; i++) {
+                        fill(random(100, 255), random(100, 255), random(100, 255));
+                        rect(random(logicalW), random(logicalH), 2, 2);
+                    }
+                }
 
                 wakeupTimer++;
                 if (wakeupTimer > 120) {
@@ -184,8 +182,9 @@
                 if (imgSleepMore) image(imgSleepMore, centerX, centerY);
 
                 sleepMoreTimer++;
-                if (sleepMoreTimer > 60) {
-                    if (owariAlpha < 255) owariAlpha += 0.5;
+                // 【修正】おわりの文字が出るまでの時間を長く（1秒から3秒へ）、フェードもゆっくりに
+                if (sleepMoreTimer > 180) {
+                    if (owariAlpha < 255) owariAlpha += 0.2;
                 }
 
                 fill(255, 255, 255, owariAlpha);
@@ -212,16 +211,18 @@
         }
 
         function mousePressed() {
+            // 【修正】連打しても絶対に重ならないように厳密にフラグ管理
             if (bgm && !isBgmStarted) {
                 isBgmStarted = true;
-                bgm.playMode('restart'); // Ensure it doesn't overlap old playback
                 bgm.setVolume(0.5);
-                bgm.loop();
-
+                
                 let savedTime = sessionStorage.getItem('bgmTime');
                 if (savedTime) {
+                    bgm.loop();
                     bgm.jump(parseFloat(savedTime));
                     sessionStorage.removeItem('bgmTime');
+                } else {
+                    bgm.loop();
                 }
             }
 
@@ -427,9 +428,8 @@
             }
             resizeCanvas(windowWidth, windowHeight);
             pixelDensity(1);
-            noSmooth(); // MUST re-add after resize or context is lost!
+            noSmooth(); 
         }
     </script>
 </body>
-
 </html>
