@@ -4,68 +4,131 @@
     <meta charset="UTF-8">
     <title>My Game Portfolio</title>
     <style>
-        /* Webページの余白をなくし、スクロールバーを出さないようにする */
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #111; /* 背景を黒に */
-            overflow: hidden;
-        }
-        /* p5.jsが作るキャンバス（描画エリア）の線を消す */
-        canvas {
-            display: block;
-        }
+        body { margin: 0; padding: 0; background-color: #111; overflow: hidden; }
+        canvas { display: block; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
 </head>
 <body>
-
     <script>
-        // GameMakerの変数の定義と同じ
-        let x = 0;
-        let y = 0;
-        let currentSize = 50; // 現在のサイズ
-        const baseSize = 50;  // 基本のサイズ
+        let playerImg;
+        let px = 50, py = 50; // キャラクターの現在位置
+        let pSize = 40; // マウスの当たり判定の半径
+        
+        // ステート（状態）管理の変数
+        let isDragging = false;
+        let isFinished = false;
 
-        // 【Createイベント】最初に1回だけ呼ばれる
-        function setup() {
-            // 画面いっぱいのキャンバス（ルーム）を作成
-            createCanvas(windowWidth, windowHeight);
-            noStroke(); // 図形の枠線をオフにする
+        function preload() {
+            // AsepriteからエクスポートしたGIFを読み込む
+            playerImg = loadImage('player.gif');
         }
 
-        // 【Step + Drawイベント】毎フレーム呼ばれる（基本60FPS）
+        function setup() {
+            createCanvas(windowWidth, windowHeight);
+            imageMode(CENTER);
+            textAlign(CENTER, CENTER);
+            textFont('sans-serif');
+        }
+
         function draw() {
-            // 1. 毎フレーム背景を黒（#111に近い色）で塗りつぶしてリセットする
             background(17);
 
-            // 2. 状態の更新（Step処理）
-            // lerp（線形補間）を使って、現在の位置からマウスの位置へ徐々に近づける
-            // 最後の数字（0.15）をいじると、追従するスピードが変わります
-            x = lerp(x, mouseX, 0.15);
-            y = lerp(y, mouseY, 0.15);
+            let cx = width / 2;
+            let cy = height / 2;
+            let goalRadius = 150; // 黄色い輪の大きさ
 
-            // クリック中かどうかでサイズと色を変える（手触りの表現）
-            if (mouseIsPressed) {
-                // クリック中は少し潰れるようにサイズを大きくする
-                currentSize = lerp(currentSize, baseSize * 1.5, 0.2);
-                fill(255, 0, 85); // 赤色
-            } else {
-                // クリックを離すと元のサイズに戻る
-                currentSize = lerp(currentSize, baseSize, 0.2);
-                fill(255); // 白色
+            // マウスとキャラクターの距離を計算（当たり判定）
+            let dToMouse = dist(mouseX, mouseY, px, py);
+            let isHovering = (dToMouse < pSize);
+
+            // ------------------------------------------------
+            // 1. 状態の更新（GameMakerのStepイベントに相当）
+            // ------------------------------------------------
+            if (!isFinished) {
+                // ゴール到達判定
+                if (dist(px, py, cx, cy) < goalRadius / 2) {
+                    isFinished = true;
+                }
+
+                if (isDragging) {
+                    // 掴んでいる状態：マウスに追従
+                    px = mouseX;
+                    py = mouseY;
+                    playerImg.play(); // アニメーションを動かす
+                } else if (isHovering) {
+                    // 触っている（妨害）状態：動かない、アニメーション停止
+                    playerImg.pause();
+                } else {
+                    // 通常状態：画面中央へ向かって歩く
+                    playerImg.play();
+                    let speed = 2;
+                    // 中央へ向かう角度を計算して移動（lengthdir_x / y のような処理）
+                    let angle = atan2(cy - py, cx - px);
+                    px += cos(angle) * speed;
+                    py += sin(angle) * speed;
+                }
             }
 
-            // 3. 描画（Draw処理）
-            // 計算した x, y の位置に、計算した currentSize の大きさで円を描く
-            ellipse(x, y, currentSize, currentSize);
+            // ------------------------------------------------
+            // 2. 描画（GameMakerのDrawイベントに相当）
+            // ------------------------------------------------
+            
+            // 常に画面中央に黄色い輪郭の丸を描画
+            noFill();
+            stroke(255, 255, 0);
+            strokeWeight(4);
+            circle(cx, cy, goalRadius);
+
+            // キャラクターの描画
+            noStroke();
+            if (isFinished) {
+                // ゴールした時：色は普通、中央に「おわり」
+                tint(255);
+                image(playerImg, px, py, playerImg.width, playerImg.height);
+                
+                fill(255);
+                noStroke();
+                textSize(48);
+                text("おわり", cx, cy);
+            } else {
+                if (isDragging) {
+                    // 掴んでいる時：元の色はそのまま、2倍に拡大、ジタバタ震える
+                    tint(255);
+                    let jitterX = random(-3, 3); // 暴れているような手触り
+                    let jitterY = random(-3, 3);
+                    image(playerImg, px + jitterX, py + jitterY, playerImg.width * 2, playerImg.height * 2);
+                } else if (isHovering) {
+                    // 触って妨害している時：赤色になる
+                    tint(255, 0, 0); // 赤色のフィルター
+                    image(playerImg, px, py, playerImg.width, playerImg.height);
+                } else {
+                    // 通常時
+                    tint(255); // 色フィルターなし（白）
+                    image(playerImg, px, py, playerImg.width, playerImg.height);
+                }
+            }
         }
 
-        // ウィンドウのサイズが変更された時にキャンバスのサイズも合わせる処理
+        // ------------------------------------------------
+        // 3. マウス入力のイベント（Mouse Pressed / Released）
+        // ------------------------------------------------
+        function mousePressed() {
+            let d = dist(mouseX, mouseY, px, py);
+            // キャラクターの上にマウスがあり、まだ終わっていないなら掴む
+            if (d < pSize && !isFinished) {
+                isDragging = true;
+            }
+        }
+
+        function mouseReleased() {
+            // マウスを離したら掴み状態を解除
+            isDragging = false;
+        }
+
         function windowResized() {
             resizeCanvas(windowWidth, windowHeight);
         }
     </script>
-
 </body>
 </html>
