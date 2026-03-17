@@ -14,7 +14,7 @@
 </head>
 <body>
     <script>
-        const PIXEL_SCALE = 4; 
+        let PIXEL_SCALE = 4; 
         const WORLD_MULT_X = 4; 
         const WORLD_MULT_Y = 2; 
         
@@ -41,6 +41,14 @@
 
         function setup() {
             createCanvas(windowWidth, windowHeight);
+            
+            // Adjust PIXEL_SCALE for smartphone portrait mode
+            if (windowWidth < 600) {
+                PIXEL_SCALE = 2;
+            } else {
+                PIXEL_SCALE = 4;
+            }
+
             // ↓ 【追加】スマホの「勝手に高画質化（巨大化）する機能」をオフにする
             pixelDensity(1);
             noSmooth(); 
@@ -276,6 +284,11 @@
 
         function windowResized() {
             createCanvas(windowWidth, windowHeight);
+            if (windowWidth < 600) {
+                PIXEL_SCALE = 2;
+            } else {
+                PIXEL_SCALE = 4;
+            }
             logicalWidth = ceil((windowWidth * WORLD_MULT_X) / PIXEL_SCALE);
             logicalHeight = ceil((windowHeight * WORLD_MULT_Y) / PIXEL_SCALE);
             generateStars();

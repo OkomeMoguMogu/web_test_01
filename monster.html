@@ -1,49 +1,63 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Wake Up!</title>
     <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; padding: 0; background-color: #000; overflow: hidden; font-family: 'DotGothic16', sans-serif; touch-action: none;}
-        canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            overflow: hidden;
+            font-family: 'DotGothic16', sans-serif;
+            touch-action: none;
+        }
+
+        canvas {
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/addons/p5.sound.min.js"></script>
 </head>
+
 <body>
     <script>
-        const PIXEL_SCALE = 4;
+        let PIXEL_SCALE = 4;
         let imgSleep, imgWakeup, imgSleepMore, playerImg;
-        
-        let bgm; 
-        let isBgmStarted = false; 
-        
+
+        let bgm;
+        let isBgmStarted = false;
+
         let sndButukaru, sndCorrect, sndIncorrect, sndKirakira;
-        
+
         let chars = [];
-        let slots = []; 
+        let slots = [];
         let particles = [];
-        let backgroundStars = []; 
-        let starAlpha = 0; 
+        let backgroundStars = [];
+        let starAlpha = 0;
         let player;
-        
-        let state = "sleep"; 
+
+        let state = "sleep";
         let wakeupTimer = 0;
         let monsterShakeTimer = 0;
-        
-        let sleepMoreTimer = 0; 
-        let owariAlpha = 0;     
+
+        let sleepMoreTimer = 0;
+        let owariAlpha = 0;
 
         function preload() {
             imgSleep = loadImage('monster_sleep.gif');
             imgWakeup = loadImage('monster_wakeup.gif');
             imgSleepMore = loadImage('monster_sleep_more.gif');
-            playerImg = loadImage('player.gif'); 
-            
-            bgm = loadSound('kataomoi.mp3'); 
-            
+            playerImg = loadImage('player.gif');
+
+            bgm = loadSound('kataomoi.mp3');
+
             // 【修正】すべてwavに変更
             sndButukaru = loadSound('snd_monster_butukaru.wav');
             sndCorrect = loadSound('snd_correct.wav');
@@ -53,12 +67,17 @@
 
         function setup() {
             createCanvas(windowWidth, windowHeight);
+            if (windowWidth < 600) {
+                PIXEL_SCALE = 2;
+            } else {
+                PIXEL_SCALE = 4;
+            }
             // ↓ 【追加】スマホの「勝手に高画質化（巨大化）する機能」をオフにする
             pixelDensity(1);
             noSmooth();
             imageMode(CENTER);
             textAlign(CENTER, CENTER);
-            textFont('DotGothic16'); 
+            textFont('DotGothic16');
 
             let logicalW = windowWidth / PIXEL_SCALE;
             let logicalH = windowHeight / PIXEL_SCALE;
@@ -67,7 +86,7 @@
 
             player = new Player(logicalW - 20, logicalH / 2);
 
-            let starCount = floor((logicalW * logicalH) / 240); 
+            let starCount = floor((logicalW * logicalH) / 240);
             for (let i = 0; i < starCount; i++) {
                 backgroundStars.push({
                     x: random(logicalW),
@@ -76,7 +95,7 @@
                 });
             }
 
-            let slotY = 30; 
+            let slotY = 30;
             let slotStartX = logicalW / 2 - 30;
             slots.push({ expected: 'お', x: slotStartX, y: slotY, filled: false });
             slots.push({ expected: 'き', x: slotStartX + 30, y: slotY, filled: false });
@@ -85,7 +104,7 @@
             let initialText = "てきおうちゅう";
             let charStartX = logicalW / 2 - (initialText.length * 16) / 2;
             let centerY = logicalH / 2;
-            let charBaseY = (slotY + centerY) / 2; 
+            let charBaseY = (slotY + centerY) / 2;
 
             for (let i = 0; i < initialText.length; i++) {
                 chars.push(new PushableChar(initialText[i], charStartX + i * 16, charBaseY));
@@ -102,14 +121,14 @@
             let centerY = logicalH / 2;
 
             if (state === "sleep_more") {
-                if (starAlpha < 255) starAlpha += 2; 
-                
+                if (starAlpha < 255) starAlpha += 2;
+
                 noStroke();
                 for (let s of backgroundStars) {
                     let n = sin(frameCount * 0.01 + s.offset);
                     if (n > 0.8) {
                         fill(255, 255, 255, starAlpha);
-                        rect(floor(s.x), floor(s.y), 2, 2); 
+                        rect(floor(s.x), floor(s.y), 2, 2);
                     } else if (n > 0.3) {
                         fill(120, 120, 120, starAlpha);
                         rect(floor(s.x), floor(s.y), 1, 1);
@@ -120,7 +139,7 @@
             if (state === "sleep") {
                 noStroke();
                 for (let s of slots) {
-                    fill(255, 255, 255, 50); 
+                    fill(255, 255, 255, 50);
                     circle(s.x, s.y, 20);
                 }
             }
@@ -133,11 +152,11 @@
                     if (monsterShakeTimer <= 0 && sndButukaru) {
                         sndButukaru.play();
                     }
-                    monsterShakeTimer = 75; 
+                    monsterShakeTimer = 75;
                     let angle = atan2(player.y - centerY, player.x - centerX);
                     player.vx = cos(angle) * 5;
                     player.vy = sin(angle) * 5;
-                    player.targetX = player.x; 
+                    player.targetX = player.x;
                     player.targetY = player.y;
                 }
 
@@ -147,8 +166,8 @@
                 }
 
                 if (imgSleep) image(imgSleep, drawX, drawY);
-                checkClearCondition(); 
-            } 
+                checkClearCondition();
+            }
             else if (state === "wakeup") {
                 push();
                 translate(centerX + random(-2, 2), centerY + random(-2, 2));
@@ -158,18 +177,18 @@
                 wakeupTimer++;
                 if (wakeupTimer > 120) {
                     state = "sleep_more";
-                    sleepMoreTimer = 0; 
+                    sleepMoreTimer = 0;
                 }
-            } 
+            }
             else if (state === "sleep_more") {
                 if (imgSleepMore) image(imgSleepMore, centerX, centerY);
-                
+
                 sleepMoreTimer++;
                 if (sleepMoreTimer > 60) {
-                    if (owariAlpha < 255) owariAlpha += 0.5; 
+                    if (owariAlpha < 255) owariAlpha += 0.5;
                 }
-                
-                fill(255, 255, 255, owariAlpha); 
+
+                fill(255, 255, 255, owariAlpha);
                 textSize(20);
                 text("おわり", centerX, centerY - 40);
             }
@@ -197,7 +216,7 @@
                 isBgmStarted = true;
                 bgm.setVolume(0.5);
                 bgm.loop();
-                
+
                 let savedTime = sessionStorage.getItem('bgmTime');
                 if (savedTime) {
                     bgm.jump(parseFloat(savedTime));
@@ -212,7 +231,7 @@
             player.targetY = realY;
 
             for (let i = 0; i < 5; i++) {
-                particles.push(new Particle(realX, realY, false)); 
+                particles.push(new Particle(realX, realY, false));
             }
         }
 
@@ -224,7 +243,7 @@
             if (allFilled) {
                 state = "wakeup";
                 wakeupTimer = 0;
-                if (sndKirakira) sndKirakira.play(); 
+                if (sndKirakira) sndKirakira.play();
             }
         }
 
@@ -232,8 +251,8 @@
             constructor(x, y) {
                 this.x = x; this.y = y;
                 this.targetX = x; this.targetY = y;
-                this.vx = 0; this.vy = 0; 
-                this.speed = 1.5; 
+                this.vx = 0; this.vy = 0;
+                this.speed = 1.5;
                 this.frameIdx = 0;
             }
 
@@ -241,11 +260,11 @@
                 if (abs(this.vx) > 0.1 || abs(this.vy) > 0.1) {
                     this.x += this.vx;
                     this.y += this.vy;
-                    this.vx *= 0.85; 
+                    this.vx *= 0.85;
                     this.vy *= 0.85;
-                    this.targetX = this.x; 
+                    this.targetX = this.x;
                     this.targetY = this.y;
-                } 
+                }
                 else {
                     let d = dist(this.x, this.y, this.targetX, this.targetY);
                     if (d > this.speed) {
@@ -277,16 +296,16 @@
             constructor(char, x, y) {
                 this.char = char;
                 this.x = x; this.y = y;
-                this.startX = x; this.startY = y; 
-                this.vx = 0; this.vy = 0; 
+                this.startX = x; this.startY = y;
+                this.vx = 0; this.vy = 0;
                 this.isPushed = false;
-                this.isLocked = false;   
-                this.isReturning = false; 
-                this.offsetY = random(100); 
+                this.isLocked = false;
+                this.isReturning = false;
+                this.offsetY = random(100);
             }
 
             update() {
-                if (this.isLocked) return; 
+                if (this.isLocked) return;
 
                 if (this.isReturning) {
                     this.x = lerp(this.x, this.startX, 0.05);
@@ -294,9 +313,9 @@
                     if (dist(this.x, this.y, this.startX, this.startY) < 1) {
                         this.x = this.startX;
                         this.y = this.startY;
-                        this.isReturning = false; 
+                        this.isReturning = false;
                     }
-                    return; 
+                    return;
                 }
 
                 let logicalW = windowWidth / PIXEL_SCALE;
@@ -308,7 +327,7 @@
                     if (monsterShakeTimer <= 0 && sndButukaru) {
                         sndButukaru.play();
                     }
-                    monsterShakeTimer = 75; 
+                    monsterShakeTimer = 75;
                     let angle = atan2(this.y - centerY, this.x - centerX);
                     this.vx = cos(angle) * 4;
                     this.vy = sin(angle) * 4;
@@ -319,11 +338,11 @@
                     this.y += this.vy;
                     this.vx *= 0.85;
                     this.vy *= 0.85;
-                } 
+                }
                 else {
                     let d = dist(player.x, player.y, this.x, this.y);
-                    let minDist = 24; 
-                    
+                    let minDist = 24;
+
                     if (d < minDist) {
                         let angle = atan2(this.y - player.y, this.x - player.x);
                         let overlap = minDist - d;
@@ -341,7 +360,7 @@
                             this.x = s.x; this.y = s.y;
                             this.isLocked = true;
                             s.filled = true;
-                            
+
                             if (sndCorrect) sndCorrect.play();
 
                             for (let i = 0; i < 15; i++) {
@@ -363,9 +382,9 @@
                 }
 
                 translate(this.x, drawY);
-                
-                if (this.isReturning) fill(255, 50, 50); 
-                else if (this.isPushed) fill(255, 255, 0); 
+
+                if (this.isReturning) fill(255, 50, 50);
+                else if (this.isPushed) fill(255, 255, 0);
                 else fill(255);
 
                 noStroke();
@@ -382,7 +401,7 @@
                 let speed = random(0.5, 2.5);
                 this.vx = cos(angle) * speed;
                 this.vy = sin(angle) * speed;
-                this.life = 40; 
+                this.life = 40;
                 if (colorful) {
                     this.col = color(random(150, 255), random(150, 255), random(150, 255));
                 } else {
@@ -394,14 +413,20 @@
                 this.life--;
             }
             draw() {
-                fill(this.col); 
+                fill(this.col);
                 rect(this.x, this.y, 1, 1);
             }
         }
 
         function windowResized() {
+            if (windowWidth < 600) {
+                PIXEL_SCALE = 2;
+            } else {
+                PIXEL_SCALE = 4;
+            }
             resizeCanvas(windowWidth, windowHeight);
         }
     </script>
 </body>
+
 </html>
