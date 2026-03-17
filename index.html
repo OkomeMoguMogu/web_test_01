@@ -1,119 +1,113 @@
 <!DOCTYPE html>
 <html lang="ja">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Scrollable Pixel Stars</title>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #000;
-            overflow: hidden;
-            touch-action: none;
-        }
-
-        canvas {
-            display: block;
-            image-rendering: pixelated;
-            image-rendering: crisp-edges;
-        }
-
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/addons/p5.sound.min.js"></script></head><body><script>let PIXEL_SCALE=4;
-        const WORLD_MULT_X=4;
-        const WORLD_MULT_Y=2;
-
-        let logicalWidth,
-        logicalHeight;
-        let stars=[];
-        let flowers=[];
-        let particles=[];
-        let flowerImg,
-        playerImg;
-        let staticFlower;
-        let player;
-
-        let bgm;
-        let sndFlower;
-        let isBgmStarted=false;
-
-        let camX=0,
-        camY=0;
+        body { margin: 0; padding: 0; background-color: #000; overflow: hidden; touch-action: none;}
+        canvas { display: block; }
+        
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/addons/p5.sound.min.js"></script>
+</head>
+<body>
+    <script>
+        let PIXEL_SCALE = 4; 
+        const WORLD_MULT_X = 4; 
+        const WORLD_MULT_Y = 2; 
+        
+        let logicalWidth, logicalHeight;
+        let stars = [];
+        let flowers = []; 
+        let particles = []; 
+        let flowerImg, playerImg;
+        let staticFlower; 
+        let player; 
+        
+        let bgm; 
+        let sndFlower; 
+        let isBgmStarted = false; 
+        
+        let camX = 0, camY = 0;
 
         function preload() {
-            flowerImg=loadImage('flower.gif');
-            playerImg=loadImage('player.gif');
-            bgm=loadSound('kataomoi.mp3');
-            sndFlower=loadSound('snd_flower.wav'); // 【修正】wavに変更
+            flowerImg = loadImage('flower.gif');
+            playerImg = loadImage('player.gif');
+            bgm = loadSound('kataomoi.mp3'); 
+            sndFlower = loadSound('snd_flower.wav'); // 【修正】wavに変更
         }
 
         function setup() {
             createCanvas(windowWidth, windowHeight);
+            
+            // Adjust PIXEL_SCALE for smartphone portrait mode
+            if (windowWidth < 600) {
+                PIXEL_SCALE = 2;
+            } else {
+                PIXEL_SCALE = 4;
+            }
 
-            // Adjust PIXEL_SCALE automatically so the screen width stays around 400-500 logical pixels
-            PIXEL_SCALE=Math.max(1, Math.round(windowWidth / 480));
-
-            // スマホの「勝手に高画質化（巨大化）する機能」をオフにする
+            // ↓ 【追加】スマホの「勝手に高画質化（巨大化）する機能」をオフにする
             pixelDensity(1);
-            noSmooth();
+            noSmooth(); 
             noStroke();
             imageMode(CENTER);
 
             if (playerImg) playerImg.pause();
-
+            
             if (flowerImg) {
                 flowerImg.pause();
                 flowerImg.setFrame(0);
-                staticFlower=flowerImg.get();
+                staticFlower = flowerImg.get(); 
             }
 
-            logicalWidth=ceil((windowWidth * WORLD_MULT_X) / PIXEL_SCALE);
-            logicalHeight=ceil((windowHeight * WORLD_MULT_Y) / PIXEL_SCALE);
+            logicalWidth = ceil((windowWidth * WORLD_MULT_X) / PIXEL_SCALE);
+            logicalHeight = ceil((windowHeight * WORLD_MULT_Y) / PIXEL_SCALE);
 
-            let startX=(windowWidth / PIXEL_SCALE) / 2;
-            let startY=(windowHeight / PIXEL_SCALE) / 2;
-            player=new Player(startX, startY);
+            let startX = (windowWidth / PIXEL_SCALE) / 2;
+            let startY = (windowHeight / PIXEL_SCALE) / 2;
+            player = new Player(startX, startY);
 
             generateStars();
             generateFlowers();
         }
 
         function generateStars() {
-            stars=[];
-            let starCount=floor((logicalWidth * logicalHeight) / 240);
-            let fadeStartX=logicalWidth * 0.5;
-            let fadeEndX=logicalWidth * 0.9;
+            stars = [];
+            let starCount = floor((logicalWidth * logicalHeight) / 240); 
+            let fadeStartX = logicalWidth * 0.5; 
+            let fadeEndX = logicalWidth * 0.9;   
 
-            for (let i=0; i < starCount; i++) {
-                let sx=random(logicalWidth);
-                let sy=random(logicalHeight);
-                let prob=1.0;
-                if (sx > fadeStartX) prob=map(sx, fadeStartX, fadeEndX, 1, 0);
+            for (let i = 0; i < starCount; i++) {
+                let sx = random(logicalWidth);
+                let sy = random(logicalHeight);
+                let prob = 1.0;
+                if (sx > fadeStartX) prob = map(sx, fadeStartX, fadeEndX, 1, 0); 
                 if (random() < prob) stars.push(new Star(sx, sy));
             }
         }
 
         function generateFlowers() {
-            flowers=[];
-            let firstX=(windowWidth / PIXEL_SCALE);
-            let baseY=logicalHeight / 2;
+            flowers = [];
+            let firstX = (windowWidth / PIXEL_SCALE);
+            let baseY = logicalHeight / 2;
 
             flowers.push(new Flower(firstX, baseY, false));
 
-            let startX=firstX+50;
-            let endX=logicalWidth - 100;
-
-            for (let x=startX; x < endX; x +=random(20, 50)) {
-                let prob=map(x, startX, endX, 1.0, 0.05);
-
+            let startX = firstX + 50;
+            let endX = logicalWidth - 100;
+            
+            for (let x = startX; x < endX; x += random(20, 50)) {
+                let prob = map(x, startX, endX, 1.0, 0.05);
                 if (random() < prob) {
-                    let y=baseY+random(-80, 80);
+                    let y = baseY + random(-80, 80); 
                     flowers.push(new Flower(x, y, false));
                 }
             }
 
-            let lastX=logicalWidth - 50;
+            let lastX = logicalWidth - 50;
             flowers.push(new Flower(lastX, baseY, true));
         }
 
@@ -121,16 +115,16 @@
             background(0);
             scale(PIXEL_SCALE);
 
-            let screenW=windowWidth / PIXEL_SCALE;
-            let screenH=windowHeight / PIXEL_SCALE;
+            let screenW = windowWidth / PIXEL_SCALE;
+            let screenH = windowHeight / PIXEL_SCALE;
+            
+            let targetCamX = (screenW / 2) - player.x;
+            let targetCamY = (screenH / 2) - player.y;
 
-            let targetCamX=(screenW / 2) - player.x;
-            let targetCamY=(screenH / 2) - player.y;
-
-            let minCamX=screenW - logicalWidth;
-            let minCamY=screenH - logicalHeight;
-            camX=constrain(targetCamX, minCamX, 0);
-            camY=constrain(targetCamY, minCamY, 0);
+            let minCamX = screenW - logicalWidth;
+            let minCamY = screenH - logicalHeight;
+            camX = constrain(targetCamX, minCamX, 0);
+            camY = constrain(targetCamY, minCamY, 0);
 
             translate(camX, camY);
 
@@ -146,64 +140,58 @@
             player.update();
             player.draw();
 
-            for (let i=particles.length - 1; i >=0; i--) {
-                let p=particles[i];
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
                 p.update();
                 p.draw();
-                if (p.life <=0) particles.splice(i, 1);
+                if (p.life <= 0) particles.splice(i, 1);
             }
         }
 
         function mousePressed() {
             if (bgm && !isBgmStarted) {
-                isBgmStarted=true;
+                isBgmStarted = true;
                 bgm.setVolume(0.5);
                 bgm.loop();
             }
 
-            let realX=(mouseX / PIXEL_SCALE) - camX;
-            let realY=(mouseY / PIXEL_SCALE) - camY;
+            let realX = (mouseX / PIXEL_SCALE) - camX;
+            let realY = (mouseY / PIXEL_SCALE) - camY;
+            
+            player.targetX = realX;
+            player.targetY = realY;
 
-            player.targetX=realX;
-            player.targetY=realY;
-
-            for (let i=0; i < 5; i++) {
+            for (let i = 0; i < 5; i++) {
                 particles.push(new Particle(realX, realY));
             }
         }
 
         class Player {
             constructor(x, y) {
-                this.x=x;
-                this.y=y;
-                this.targetX=x;
-                this.targetY=y;
-                this.speed=1.5;
-                this.frameIdx=0;
+                this.x = x; this.y = y;
+                this.targetX = x; this.targetY = y;
+                this.speed = 1.5; 
+                this.frameIdx = 0;
             }
 
             update() {
-                let d=dist(this.x, this.y, this.targetX, this.targetY);
-
+                let d = dist(this.x, this.y, this.targetX, this.targetY);
                 if (d > this.speed) {
-                    let angle=atan2(this.targetY - this.y, this.targetX - this.x);
-                    this.x+=cos(angle) * this.speed;
-                    this.y+=sin(angle) * this.speed;
-
+                    let angle = atan2(this.targetY - this.y, this.targetX - this.x);
+                    this.x += cos(angle) * this.speed;
+                    this.y += sin(angle) * this.speed;
                     if (playerImg && playerImg.numFrames() > 0) {
-                        this.frameIdx=floor(frameCount / 10) % playerImg.numFrames();
+                        this.frameIdx = floor(frameCount / 10) % playerImg.numFrames();
                     }
-                }
-
-                else {
-                    this.x=this.targetX;
-                    this.y=this.targetY;
-                    this.frameIdx=0;
+                } else {
+                    this.x = this.targetX;
+                    this.y = this.targetY;
+                    this.frameIdx = 0;
                 }
             }
 
             draw() {
-                if ( !playerImg) return;
+                if (!playerImg) return;
                 playerImg.setFrame(this.frameIdx);
                 push();
                 translate(this.x, this.y);
@@ -215,69 +203,58 @@
 
         class Particle {
             constructor(x, y) {
-                this.x=x;
-                this.y=y;
-                let angle=random(TWO_PI);
-                let speed=random(0.5, 2.0);
-                this.vx=cos(angle) * speed;
-                this.vy=sin(angle) * speed;
-                this.life=30;
+                this.x = x; this.y = y;
+                let angle = random(TWO_PI);
+                let speed = random(0.5, 2.0);
+                this.vx = cos(angle) * speed;
+                this.vy = sin(angle) * speed;
+                this.life = 30; 
             }
-
             update() {
-                this.x+=this.vx;
-                this.y+=this.vy;
+                this.x += this.vx; this.y += this.vy;
                 this.life--;
             }
-
             draw() {
-                fill(255);
+                fill(255); 
                 rect(this.x, this.y, 1, 1);
             }
         }
 
         class Flower {
             constructor(x, y, isPink) {
-                this.x=x;
-                this.y=y;
-                this.isPink=isPink;
-                this.isTouched=false;
+                this.x = x; this.y = y;
+                this.isPink = isPink;
+                this.isTouched = false; 
             }
 
             draw() {
-                if ( !flowerImg || !staticFlower) return;
+                if (!flowerImg || !staticFlower) return;
 
-                let d=dist(player.x, player.y, this.x, this.y);
-
+                let d = dist(player.x, player.y, this.x, this.y);
+                
                 if (this.isPink) tint(255, 100, 150);
                 else tint(255);
 
                 if (d < 20) {
-                    if ( !this.isTouched) {
+                    if (!this.isTouched) {
                         if (sndFlower && !this.isPink) sndFlower.play();
-                        this.isTouched=true;
+                        this.isTouched = true;
                     }
 
-                    let totalFrames=flowerImg.numFrames();
-
+                    let totalFrames = flowerImg.numFrames();
                     if (totalFrames > 0) {
                         flowerImg.setFrame(floor(frameCount / 10) % totalFrames);
                     }
-
                     image(flowerImg, this.x, this.y);
 
                     if (this.isPink && d < 10) {
                         if (bgm && bgm.isPlaying()) {
                             sessionStorage.setItem('bgmTime', bgm.currentTime());
-                            bgm.stop(); // Stop audio explicitly before changing pages
                         }
-
-                        window.location.href='monster.html';
+                        window.location.href = 'monster.html';
                     }
-                }
-
-                else {
-                    this.isTouched=false;
+                } else {
+                    this.isTouched = false; 
                     image(staticFlower, this.x, this.y);
                 }
 
@@ -287,42 +264,36 @@
 
         class Star {
             constructor(x, y) {
-                this.x=x;
-                this.y=y;
-                this.offset=random(100);
-                this.brightness=0;
+                this.x = x; this.y = y;
+                this.offset = random(100); this.brightness = 0;
             }
-
             update() {
-                let n=sin(frameCount * 0.01 + this.offset);
-                if (n > 0.8) this.brightness=2;
-                else if (n > 0.3) this.brightness=1;
-                else this.brightness=0;
+                let n = sin(frameCount * 0.01 + this.offset);
+                if (n > 0.8) this.brightness = 2;
+                else if (n > 0.3) this.brightness = 1;
+                else this.brightness = 0;
             }
-
             draw() {
-                if (this.brightness===2) {
-                    fill(255);
-                    rect(floor(this.x), floor(this.y), 2, 2);
-                }
-
-                else if (this.brightness===1) {
-                    fill(120);
-                    rect(floor(this.x), floor(this.y), 1, 1);
+                if (this.brightness === 2) {
+                    fill(255); rect(floor(this.x), floor(this.y), 2, 2); 
+                } else if (this.brightness === 1) {
+                    fill(120); rect(floor(this.x), floor(this.y), 1, 1);
                 }
             }
         }
 
         function windowResized() {
-            resizeCanvas(windowWidth, windowHeight); // Use resizeCanvas instead of createCanvas to not destroy elements
-            PIXEL_SCALE=Math.max(1, Math.round(windowWidth / 480));
-            pixelDensity(1);
-            noSmooth(); // Re-apply noSmooth after resizing!
-
-            logicalWidth=ceil((windowWidth * WORLD_MULT_X) / PIXEL_SCALE);
-            logicalHeight=ceil((windowHeight * WORLD_MULT_Y) / PIXEL_SCALE);
+            createCanvas(windowWidth, windowHeight);
+            if (windowWidth < 600) {
+                PIXEL_SCALE = 2;
+            } else {
+                PIXEL_SCALE = 4;
+            }
+            logicalWidth = ceil((windowWidth * WORLD_MULT_X) / PIXEL_SCALE);
+            logicalHeight = ceil((windowHeight * WORLD_MULT_Y) / PIXEL_SCALE);
             generateStars();
             generateFlowers();
         }
-
-        </script></body></html>
+    </script>
+</body>
+</html>
