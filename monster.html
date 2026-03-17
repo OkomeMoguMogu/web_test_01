@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Wake Up!</title>
+    <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; padding: 0; background-color: #000; overflow: hidden; font-family: 'DotGothic16', sans-serif; }
+        canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/addons/p5.sound.min.js"></script>
+</head>
+<body>
+    <script>
+        const PIXEL_SCALE = 4;
+        let imgSleep, imgWakeup, imgSleepMore, playerImg;
+        
+        let bgm; 
+        let isBgmStarted = false; 
+        
+        let sndButukaru, sndCorrect, sndIncorrect, sndKirakira;
+        
+        let chars = [];
+        let slots = []; 
+        let particles = [];
+        let backgroundStars = []; 
+        let starAlpha = 0; 
+        let player;
+        
+        let state = "sleep"; 
+        let wakeupTimer = 0;
+        let monsterShakeTimer = 0;
+        
+        let sleepMoreTimer = 0; 
+        let owariAlpha = 0;     
+
+        function preload() {
+            imgSleep = loadImage('monster_sleep.gif');
+            imgWakeup = loadImage('monster_wakeup.gif');
+            imgSleepMore = loadImage('monster_sleep_more.gif');
+            playerImg = loadImage('player.gif'); 
+            
+            bgm = loadSound('kataomoi.mp3'); 
+            
+            // 【修正】すべてwavに変更
+            sndButukaru = loadSound('snd_monster_butukaru.wav');
+            sndCorrect = loadSound('snd_correct.wav');
+            sndIncorrect = loadSound('snd_incorrect.wav');
+            sndKirakira = loadSound('snd_kirakira.wav');
+        }
+
+        function setup() {
+            createCanvas(windowWidth, windowHeight);
+            noSmooth();
+            imageMode(CENTER);
+            textAlign(CENTER, CENTER);
+            textFont('DotGothic16'); 
+
+            let logicalW = windowWidth / PIXEL_SCALE;
+            let logicalH = windowHeight / PIXEL_SCALE;
+
+            if (playerImg) playerImg.pause();
+
+            player = new Player(logicalW - 20, logicalH / 2);
+
+            let starCount = floor((logicalW * logicalH) / 240); 
+            for (let i = 0; i < starCount; i++) {
+                backgroundStars.push({
+                    x: random(logicalW),
+                    y: random(logicalH),
+                    offset: random(100)
+                });
+            }
+
+            let slotY = 30; 
+            let slotStartX = logicalW / 2 - 30;
+            slots.push({ expected: 'お', x: slotStartX, y: slotY, filled: false });
+            slots.push({ expected: 'き', x: slotStartX + 30, y: slotY, filled: false });
+            slots.push({ expected: 'て', x: slotStartX + 60, y: slotY, filled: false });
+
+            let initialText = "てきおうちゅう";
+            let charStartX = logicalW / 2 - (initialText.length * 16) / 2;
+            let centerY = logicalH / 2;
+            let charBaseY = (slotY + centerY) / 2; 
+
+            for (let i = 0; i < initialText.length; i++) {
+                chars.push(new PushableChar(initialText[i], charStartX + i * 16, charBaseY));
+            }
+        }
+
+        function draw() {
+            background(0);
+            scale(PIXEL_SCALE);
+
+            let logicalW = windowWidth / PIXEL_SCALE;
+            let logicalH = windowHeight / PIXEL_SCALE;
+            let centerX = logicalW / 2;
+            let centerY = logicalH / 2;
+
+            if (state === "sleep_more") {
+                if (starAlpha < 255) starAlpha += 2; 
+                
+                noStroke();
+                for (let s of backgroundStars) {
+                    let n = sin(frameCount * 0.01 + s.offset);
+                    if (n > 0.8) {
+                        fill(255, 255, 255, starAlpha);
+                        rect(floor(s.x), floor(s.y), 2, 2); 
+                    } else if (n > 0.3) {
+                        fill(120, 120, 120, starAlpha);
+                        rect(floor(s.x), floor(s.y), 1, 1);
+                    }
+                }
+            }
+
+            if (state === "sleep") {
+                noStroke();
+                for (let s of slots) {
+                    fill(255, 255, 255, 50); 
+                    circle(s.x, s.y, 20);
+                }
+            }
+
+            if (state === "sleep") {
+                let drawX = centerX;
+                let drawY = centerY;
+
+                if (dist(player.x, player.y, centerX, centerY) < 25) {
+                    if (monsterShakeTimer <= 0 && sndButukaru) {
+                        sndButukaru.play();
+                    }
+                    monsterShakeTimer = 75; 
+                    let angle = atan2(player.y - centerY, player.x - centerX);
+                    player.vx = cos(angle) * 5;
+                    player.vy = sin(angle) * 5;
+                    player.targetX = player.x; 
+                    player.targetY = player.y;
+                }
+
+                if (monsterShakeTimer > 0) {
+                    drawX += sin(frameCount * 0.5) * 3;
+                    monsterShakeTimer--;
+                }
+
+                if (imgSleep) image(imgSleep, drawX, drawY);
+                checkClearCondition(); 
+            } 
+            else if (state === "wakeup") {
+                push();
+                translate(centerX + random(-2, 2), centerY + random(-2, 2));
+                if (imgWakeup) image(imgWakeup, 0, 0);
+                pop();
+
+                wakeupTimer++;
+                if (wakeupTimer > 120) {
+                    state = "sleep_more";
+                    sleepMoreTimer = 0; 
+                }
+            } 
+            else if (state === "sleep_more") {
+                if (imgSleepMore) image(imgSleepMore, centerX, centerY);
+                
+                sleepMoreTimer++;
+                if (sleepMoreTimer > 60) {
+                    if (owariAlpha < 255) owariAlpha += 0.5; 
+                }
+                
+                fill(255, 255, 255, owariAlpha); 
+                textSize(20);
+                text("おわり", centerX, centerY - 40);
+            }
+
+            if (state === "sleep") {
+                player.update();
+                player.draw();
+
+                for (let c of chars) {
+                    c.update();
+                    c.draw();
+                }
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.update();
+                p.draw();
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function mousePressed() {
+            if (bgm && !isBgmStarted) {
+                isBgmStarted = true;
+                bgm.setVolume(0.5);
+                bgm.loop();
+                
+                let savedTime = sessionStorage.getItem('bgmTime');
+                if (savedTime) {
+                    bgm.jump(parseFloat(savedTime));
+                    sessionStorage.removeItem('bgmTime');
+                }
+            }
+
+            if (state !== "sleep") return;
+            let realX = mouseX / PIXEL_SCALE;
+            let realY = mouseY / PIXEL_SCALE;
+            player.targetX = realX;
+            player.targetY = realY;
+
+            for (let i = 0; i < 5; i++) {
+                particles.push(new Particle(realX, realY, false)); 
+            }
+        }
+
+        function checkClearCondition() {
+            let allFilled = true;
+            for (let s of slots) {
+                if (!s.filled) allFilled = false;
+            }
+            if (allFilled) {
+                state = "wakeup";
+                wakeupTimer = 0;
+                if (sndKirakira) sndKirakira.play(); 
+            }
+        }
+
+        class Player {
+            constructor(x, y) {
+                this.x = x; this.y = y;
+                this.targetX = x; this.targetY = y;
+                this.vx = 0; this.vy = 0; 
+                this.speed = 1.5; 
+                this.frameIdx = 0;
+            }
+
+            update() {
+                if (abs(this.vx) > 0.1 || abs(this.vy) > 0.1) {
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    this.vx *= 0.85; 
+                    this.vy *= 0.85;
+                    this.targetX = this.x; 
+                    this.targetY = this.y;
+                } 
+                else {
+                    let d = dist(this.x, this.y, this.targetX, this.targetY);
+                    if (d > this.speed) {
+                        let angle = atan2(this.targetY - this.y, this.targetX - this.x);
+                        this.x += cos(angle) * this.speed;
+                        this.y += sin(angle) * this.speed;
+                        if (playerImg && playerImg.numFrames() > 0) {
+                            this.frameIdx = floor(frameCount / 10) % playerImg.numFrames();
+                        }
+                    } else {
+                        this.x = this.targetX; this.y = this.targetY;
+                        this.frameIdx = 0;
+                    }
+                }
+            }
+
+            draw() {
+                if (!playerImg) return;
+                playerImg.setFrame(this.frameIdx);
+                push();
+                translate(this.x, this.y);
+                if (this.targetX < this.x) scale(-1, 1);
+                image(playerImg, 0, 0);
+                pop();
+            }
+        }
+
+        class PushableChar {
+            constructor(char, x, y) {
+                this.char = char;
+                this.x = x; this.y = y;
+                this.startX = x; this.startY = y; 
+                this.vx = 0; this.vy = 0; 
+                this.isPushed = false;
+                this.isLocked = false;   
+                this.isReturning = false; 
+                this.offsetY = random(100); 
+            }
+
+            update() {
+                if (this.isLocked) return; 
+
+                if (this.isReturning) {
+                    this.x = lerp(this.x, this.startX, 0.05);
+                    this.y = lerp(this.y, this.startY, 0.05);
+                    if (dist(this.x, this.y, this.startX, this.startY) < 1) {
+                        this.x = this.startX;
+                        this.y = this.startY;
+                        this.isReturning = false; 
+                    }
+                    return; 
+                }
+
+                let logicalW = windowWidth / PIXEL_SCALE;
+                let logicalH = windowHeight / PIXEL_SCALE;
+                let centerX = logicalW / 2;
+                let centerY = logicalH / 2;
+
+                if (dist(this.x, this.y, centerX, centerY) < 25 && state === "sleep") {
+                    if (monsterShakeTimer <= 0 && sndButukaru) {
+                        sndButukaru.play();
+                    }
+                    monsterShakeTimer = 75; 
+                    let angle = atan2(this.y - centerY, this.x - centerX);
+                    this.vx = cos(angle) * 4;
+                    this.vy = sin(angle) * 4;
+                }
+
+                if (abs(this.vx) > 0.1 || abs(this.vy) > 0.1) {
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    this.vx *= 0.85;
+                    this.vy *= 0.85;
+                } 
+                else {
+                    let d = dist(player.x, player.y, this.x, this.y);
+                    let minDist = 24; 
+                    
+                    if (d < minDist) {
+                        let angle = atan2(this.y - player.y, this.x - player.x);
+                        let overlap = minDist - d;
+                        this.x += cos(angle) * overlap;
+                        this.y += sin(angle) * overlap;
+                        this.isPushed = true;
+                    } else {
+                        this.isPushed = false;
+                    }
+                }
+
+                for (let s of slots) {
+                    if (dist(this.x, this.y, s.x, s.y) < 10) {
+                        if (this.char === s.expected && !s.filled) {
+                            this.x = s.x; this.y = s.y;
+                            this.isLocked = true;
+                            s.filled = true;
+                            
+                            if (sndCorrect) sndCorrect.play();
+
+                            for (let i = 0; i < 15; i++) {
+                                particles.push(new Particle(s.x, s.y, true));
+                            }
+                        } else if (!this.isLocked && !this.isReturning) {
+                            this.isReturning = true;
+                            if (sndIncorrect) sndIncorrect.play();
+                        }
+                    }
+                }
+            }
+
+            draw() {
+                push();
+                let drawY = this.y;
+                if (!this.isPushed && !this.isLocked && state === "sleep" && !this.isReturning) {
+                    drawY += sin(frameCount * 0.05 + this.offsetY) * 3;
+                }
+
+                translate(this.x, drawY);
+                
+                if (this.isReturning) fill(255, 50, 50); 
+                else if (this.isPushed) fill(255, 255, 0); 
+                else fill(255);
+
+                noStroke();
+                textSize(14);
+                text(this.char, 0, 0);
+                pop();
+            }
+        }
+
+        class Particle {
+            constructor(x, y, colorful) {
+                this.x = x; this.y = y;
+                let angle = random(TWO_PI);
+                let speed = random(0.5, 2.5);
+                this.vx = cos(angle) * speed;
+                this.vy = sin(angle) * speed;
+                this.life = 40; 
+                if (colorful) {
+                    this.col = color(random(150, 255), random(150, 255), random(150, 255));
+                } else {
+                    this.col = color(255);
+                }
+            }
+            update() {
+                this.x += this.vx; this.y += this.vy;
+                this.life--;
+            }
+            draw() {
+                fill(this.col); 
+                rect(this.x, this.y, 1, 1);
+            }
+        }
+
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+        }
+    </script>
+</body>
+</html>
