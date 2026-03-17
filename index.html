@@ -12,15 +12,21 @@
 <body>
     <script>
         let playerImg;
-        let px = 50, py = 50; // キャラクターの現在位置
-        let pSize = 40; // マウスの当たり判定の半径
         
-        // ステート（状態）管理の変数
-        let isDragging = false;
-        let isFinished = false;
+        // GameMakerの「インスタンスリスト」のようなもの
+        let enemies = [];
+        let puyos = [];
+        
+        // ゲーム管理用の変数
+        let baseSpeed = 2;
+        let waveCount = 1;
+        let isGameOver = false;
+        let draggedEnemy = null; // 現在マウスで掴んでいる敵
+
+        // 牢屋のエリア定義
+        let jail = { x: 0, y: 0, w: 240, h: 150 };
 
         function preload() {
-            // AsepriteからエクスポートしたGIFを読み込む
             playerImg = loadImage('player.gif');
         }
 
@@ -29,107 +35,285 @@
             imageMode(CENTER);
             textAlign(CENTER, CENTER);
             textFont('sans-serif');
+
+            // 牢屋を画面上部の中央に配置
+            jail.x = width / 2 - jail.w / 2;
+
+            // 最初にぷよぷよを10個、画面中央付近にランダム配置
+            for (let i = 0; i < 10; i++) {
+                puyos.push(new Puyo(width / 2 + random(-40, 40), height / 2 + random(-40, 40)));
+            }
         }
 
         function draw() {
             background(17);
 
-            let cx = width / 2;
-            let cy = height / 2;
-            let goalRadius = 150; // 黄色い輪の大きさ
+            if (puyos.length === 0) {
+                isGameOver = true;
+            }
 
-            // マウスとキャラクターの距離を計算（当たり判定）
-            let dToMouse = dist(mouseX, mouseY, px, py);
-            let isHovering = (dToMouse < pSize);
-
-            // ------------------------------------------------
-            // 1. 状態の更新（GameMakerのStepイベントに相当）
-            // ------------------------------------------------
-            if (!isFinished) {
-                // ゴール到達判定
-                if (dist(px, py, cx, cy) < goalRadius / 2) {
-                    isFinished = true;
+            if (!isGameOver) {
+                // ------------------------------------------------
+                // ゲームマネージャー（ウェーブと速度の管理）
+                // ------------------------------------------------
+                // 60フレーム＝1秒。5秒(300F)ごとに敵を増やす
+                if (frameCount % 300 === 0) {
+                    for (let i = 0; i < waveCount; i++) {
+                        enemies.push(new Enemy());
+                    }
+                    waveCount++; // 次のウェーブは1体多く湧く
                 }
 
-                if (isDragging) {
-                    // 掴んでいる状態：マウスに追従
-                    px = mouseX;
-                    py = mouseY;
-                    playerImg.play(); // アニメーションを動かす
-                } else if (isHovering) {
-                    // 触っている（妨害）状態：動かない、アニメーション停止
-                    playerImg.pause();
-                } else {
-                    // 通常状態：画面中央へ向かって歩く
-                    playerImg.play();
-                    let speed = 2;
-                    // 中央へ向かう角度を計算して移動（lengthdir_x / y のような処理）
-                    let angle = atan2(cy - py, cx - px);
-                    px += cos(angle) * speed;
-                    py += sin(angle) * speed;
+                // 12秒(720F)ごとに移動速度を1.1倍に
+                if (frameCount % 720 === 0) {
+                    baseSpeed *= 1.1;
                 }
             }
 
             // ------------------------------------------------
-            // 2. 描画（GameMakerのDrawイベントに相当）
+            // 牢屋の描画
             // ------------------------------------------------
-            
-            // 常に画面中央に黄色い輪郭の丸を描画
-            noFill();
-            stroke(255, 255, 0);
-            strokeWeight(4);
-            circle(cx, cy, goalRadius);
+            fill(40); stroke(100); strokeWeight(4);
+            rect(jail.x, jail.y, jail.w, jail.h);
+            // 鉄格子
+            stroke(80); strokeWeight(6);
+            for(let i = 1; i < 5; i++) {
+                line(jail.x + (jail.w / 5) * i, jail.y, jail.x + (jail.w / 5) * i, jail.y + jail.h);
+            }
 
-            // キャラクターの描画
-            noStroke();
-            if (isFinished) {
-                // ゴールした時：色は普通、中央に「おわり」
-                tint(255);
-                image(playerImg, px, py, playerImg.width, playerImg.height);
-                
-                fill(255);
-                noStroke();
-                textSize(48);
-                text("おわり", cx, cy);
-            } else {
-                if (isDragging) {
-                    // 掴んでいる時：元の色はそのまま、2倍に拡大、ジタバタ震える
-                    tint(255);
-                    let jitterX = random(-3, 3); // 暴れているような手触り
-                    let jitterY = random(-3, 3);
-                    image(playerImg, px + jitterX, py + jitterY, playerImg.width * 2, playerImg.height * 2);
-                } else if (isHovering) {
-                    // 触って妨害している時：赤色になる
-                    tint(255, 0, 0); // 赤色のフィルター
-                    image(playerImg, px, py, playerImg.width, playerImg.height);
-                } else {
-                    // 通常時
-                    tint(255); // 色フィルターなし（白）
-                    image(playerImg, px, py, playerImg.width, playerImg.height);
+            // ------------------------------------------------
+            // ぷよぷよの更新と描画
+            // ------------------------------------------------
+            for (let p of puyos) {
+                p.draw();
+            }
+
+            // ------------------------------------------------
+            // 敵キャラの更新と描画（GameMakerのStep & Draw）
+            // ------------------------------------------------
+            // ※配列から要素を削除する可能性があるため、後ろからループを回す
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                let e = enemies[i];
+                e.update();
+                e.draw();
+
+                // 画面外に完全に出た敵を消去する処理
+                if (e.x < -100 || e.x > width + 100 || e.y < -100 || e.y > height + 100) {
+                    // もしぷよぷよを持ったまま画面外に消えたら、そのぷよぷよを完全消滅させる
+                    if (e.carriedPuyo) {
+                        let pIndex = puyos.indexOf(e.carriedPuyo);
+                        if (pIndex > -1) puyos.splice(pIndex, 1);
+                    }
+                    enemies.splice(i, 1); // 敵自身を消す
                 }
+            }
+
+            // ------------------------------------------------
+            // ゲームオーバー表示
+            // ------------------------------------------------
+            if (isGameOver) {
+                fill(255); noStroke(); textSize(64);
+                text("おわり", width / 2, height / 2);
             }
         }
 
-        // ------------------------------------------------
-        // 3. マウス入力のイベント（Mouse Pressed / Released）
-        // ------------------------------------------------
+        // ==========================================
+        // マウス操作のイベント
+        // ==========================================
         function mousePressed() {
-            let d = dist(mouseX, mouseY, px, py);
-            // キャラクターの上にマウスがあり、まだ終わっていないなら掴む
-            if (d < pSize && !isFinished) {
-                isDragging = true;
+            if (isGameOver) return;
+            // 敵をクリックして掴む（後ろから判定して一番手前の1体だけ）
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                let e = enemies[i];
+                if (e.state === "jail") continue; // 牢屋の中の奴は触れない
+                
+                if (dist(mouseX, mouseY, e.x, e.y) < e.size / 2) {
+                    draggedEnemy = e;
+                    e.state = "drag";
+                    // もしぷよぷよを持っていたらその場に落とす
+                    if (e.carriedPuyo) {
+                        e.carriedPuyo.isCarried = false;
+                        e.carriedPuyo = null;
+                    }
+                    break; 
+                }
             }
         }
 
         function mouseReleased() {
-            // マウスを離したら掴み状態を解除
-            isDragging = false;
+            if (draggedEnemy) {
+                // 牢屋のエリア内で離したか判定
+                if (mouseX > jail.x && mouseX < jail.x + jail.w && mouseY > jail.y && mouseY < jail.y + jail.h) {
+                    draggedEnemy.state = "jail";
+                    // 牢屋の中で暴れ回る初速を与える
+                    draggedEnemy.vx = random(-4, 4);
+                    draggedEnemy.vy = random(2, 4);
+                } else {
+                    draggedEnemy.state = "seek"; // 通常モードに戻る
+                }
+                draggedEnemy = null;
+            }
+        }
+
+        // ==========================================
+        // クラス定義（GameMakerのオブジェクトに相当）
+        // ==========================================
+
+        // --- ぷよぷよクラス ---
+        class Puyo {
+            constructor(x, y) {
+                this.x = x; this.y = y;
+                this.isCarried = false;
+                this.size = 20; // キャラの半分くらいの大きさ
+                this.timeOffset = random(100); // ぷよぷよ揺れるタイミングをズラす
+            }
+            draw() {
+                push();
+                translate(this.x, this.y);
+                // sin波を使ってゼリーのように縦横に伸縮させる
+                let scaleX = 1 + sin(frameCount * 0.1 + this.timeOffset) * 0.15;
+                let scaleY = 1 + cos(frameCount * 0.1 + this.timeOffset) * 0.15;
+                scale(scaleX, scaleY);
+                fill(255, 200, 0); noStroke();
+                circle(0, 0, this.size);
+                pop();
+            }
+        }
+
+        // --- 敵キャラクタークラス ---
+        class Enemy {
+            constructor() {
+                // 画面外のランダムな位置（上下左右）から湧かせる
+                let edge = floor(random(4));
+                if (edge === 0) { this.x = random(width); this.y = -80; }
+                else if (edge === 1) { this.x = width + 80; this.y = random(height); }
+                else if (edge === 2) { this.x = random(width); this.y = height + 80; }
+                else { this.x = -80; this.y = random(height); }
+
+                this.size = 64; // 【変更点】キャラを元の約2倍の当たり判定に
+                this.state = "seek"; // 状態：seek(探す), carry(運ぶ), drag(掴まれ), knockback(吹っ飛び), jail(牢屋)
+                this.carriedPuyo = null;
+                this.vx = 0; this.vy = 0;
+            }
+
+            update() {
+                if (isGameOver) return;
+
+                // 状態ごとの処理（ステートマシン）
+                if (this.state === "drag") {
+                    this.x = mouseX; this.y = mouseY;
+                    return;
+                }
+
+                if (this.state === "jail") {
+                    // 牢屋の中で反射して動き回る
+                    this.x += this.vx; this.y += this.vy;
+                    if (this.x < jail.x + 20 || this.x > jail.x + jail.w - 20) this.vx *= -1;
+                    if (this.y < jail.y + 20 || this.y > jail.y + jail.h - 20) this.vy *= -1;
+                    return;
+                }
+
+                if (this.state === "knockback") {
+                    // ノックバック：慣性で吹っ飛び、徐々に減速する
+                    this.x += this.vx; this.y += this.vy;
+                    this.vx *= 0.85; this.vy *= 0.85;
+                    if (abs(this.vx) < 0.5 && abs(this.vy) < 0.5) this.state = "seek";
+                    return;
+                }
+
+                // --- マウスが触れた時の妨害（ノックバック＆ぷよ落とし） ---
+                let dToMouse = dist(mouseX, mouseY, this.x, this.y);
+                if (this.state === "carry" && dToMouse < this.size / 2 && draggedEnemy === null) {
+                    // 運搬中にマウスが触れたら落として吹っ飛ぶ
+                    this.carriedPuyo.isCarried = false;
+                    this.carriedPuyo = null;
+                    this.state = "knockback";
+                    // マウスの反対方向へ強い力を加える
+                    let angleToMouse = atan2(this.y - mouseY, this.x - mouseX);
+                    this.vx = cos(angleToMouse) * 15;
+                    this.vy = sin(angleToMouse) * 15;
+                    return;
+                }
+
+                // --- 通常の移動アルゴリズム（AI） ---
+                let targetX = width / 2;
+                let targetY = height / 2;
+
+                if (this.state === "seek") {
+                    // 誰も持っていない一番近いぷよぷよを探す
+                    let nearest = null; let minDist = Infinity;
+                    for (let p of puyos) {
+                        if (!p.isCarried) {
+                            let d = dist(this.x, this.y, p.x, p.y);
+                            if (d < minDist) { minDist = d; nearest = p; }
+                        }
+                    }
+
+                    if (nearest) {
+                        targetX = nearest.x; targetY = nearest.y;
+                        if (minDist < this.size / 2) {
+                            // 触れたら頭に乗せる
+                            nearest.isCarried = true;
+                            this.carriedPuyo = nearest;
+                            this.state = "carry";
+                        }
+                    }
+                } else if (this.state === "carry") {
+                    // ぷよを持ったら一番近い画面端へ逃げる
+                    let dLeft = this.x; let dRight = width - this.x;
+                    let dTop = this.y; let dBottom = height - this.y;
+                    let minEdge = min(dLeft, dRight, dTop, dBottom);
+                    
+                    if (minEdge === dLeft) targetX = -100;
+                    else if (minEdge === dRight) targetX = width + 100;
+                    else if (minEdge === dTop) targetX = this.x, targetY = -100;
+                    else targetX = this.x, targetY = height + 100;
+
+                    // ぷよぷよを頭の上（Y軸マイナス方向）に固定する
+                    this.carriedPuyo.x = this.x;
+                    this.carriedPuyo.y = this.y - 30; 
+                }
+
+                // 目標座標へ向かって移動する（GameMakerの point_direction と lengthdir の処理）
+                let angle = atan2(targetY - this.y, targetX - this.x);
+                this.x += cos(angle) * baseSpeed;
+                this.y += sin(angle) * baseSpeed;
+            }
+
+            draw() {
+                push();
+                translate(this.x, this.y);
+
+                // 【変更点】画面の右半分にいるときは左右反転する
+                if (this.x > width / 2) {
+                    scale(-1, 1);
+                }
+
+                if (this.state === "drag") {
+                    // 【変更点】掴まれている時はさらに2倍に拡大＆ジタバタ（アニメ倍速の代わり）
+                    scale(2);
+                    translate(random(-2, 2), random(-2, 2));
+                    tint(255);
+                } else if (this.state === "knockback") {
+                    tint(255, 100, 100); // 吹っ飛んでる時は少し赤く
+                } else if (this.state === "jail") {
+                    tint(150); // 牢屋の中は暗く
+                } else {
+                    tint(255);
+                }
+
+                // キャラクターを元から2倍のサイズで描画
+                if (playerImg) {
+                    image(playerImg, 0, 0, playerImg.width * 2, playerImg.height * 2);
+                }
+                pop();
+            }
         }
 
         function windowResized() {
             resizeCanvas(windowWidth, windowHeight);
+            jail.x = width / 2 - jail.w / 2; // リサイズ時に牢屋の位置を直す
         }
     </script>
 </body>
 </html>
-//test
