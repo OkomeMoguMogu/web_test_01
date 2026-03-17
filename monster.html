@@ -26,6 +26,9 @@
         let slots = [];
         let particles = [];
         let backgroundStars = [];
+        let zzzs = []; 
+        let zzzTimer = 0; // zzzエフェクトの管理タイマー
+        
         let starAlpha = 0;
         let player;
 
@@ -35,6 +38,16 @@
 
         let sleepMoreTimer = 0;
         let owariAlpha = 0;
+        
+        let fadeAlpha = 255; // 暗転からのフェードイン用
+
+        // 【追加】言葉が揃った時のアニメーション管理
+        let clearState = ""; 
+        let clearTimer = 0;
+
+        // 【追加】正解ルートの定義
+        const PATH_OKITE = ['お', 'き', 'て'];
+        const PATH_CHUU  = ['ち', 'ゅ', 'う'];
 
         function preload() {
             imgSleep = loadImage('monster_sleep.gif');
@@ -52,8 +65,6 @@
 
         function setup() {
             createCanvas(windowWidth, windowHeight);
-            
-            // 【超重要】どんなスマホでも同じ速度（1秒間に60コマ）で計算するように固定！
             frameRate(60);
             
             if (windowWidth < 600) {
@@ -90,9 +101,9 @@
 
             let slotY = 30;
             let slotStartX = logicalW / 2 - 30;
-            slots.push({ expected: 'お', x: slotStartX, y: slotY, filled: false });
-            slots.push({ expected: 'き', x: slotStartX + 30, y: slotY, filled: false });
-            slots.push({ expected: 'て', x: slotStartX + 60, y: slotY, filled: false });
+            slots.push({ x: slotStartX, y: slotY, filled: false, charObj: null });
+            slots.push({ x: slotStartX + 30, y: slotY, filled: false, charObj: null });
+            slots.push({ x: slotStartX + 60, y: slotY, filled: false, charObj: null });
 
             let initialText = "てきおうちゅう";
             let charStartX = logicalW / 2 - (initialText.length * 16) / 2;
@@ -106,6 +117,8 @@
 
         function draw() {
             background(0);
+            
+            push();
             scale(PIXEL_SCALE);
 
             let logicalW = width / PIXEL_SCALE;
@@ -137,14 +150,29 @@
                 }
             }
 
+            // 【変更】zのエフェクトを小文字にし、3回連続→全消滅→1秒待機 のサイクルにする
+            if (state === "sleep" || state === "sleep_more") {
+                zzzTimer++;
+                // 20フレームごとに3回出す
+                if (zzzTimer === 20) zzzs.push(new Zzz(centerX + 15, centerY - 20));
+                if (zzzTimer === 40) zzzs.push(new Zzz(centerX + 25, centerY - 30));
+                if (zzzTimer === 60) zzzs.push(new Zzz(centerX + 35, centerY - 40));
+                // 3つ目の寿命(60f)が尽きるのが120フレーム目。そこから1秒(60f)待つので合計180でリセット
+                if (zzzTimer > 180) zzzTimer = 0; 
+            }
+
+            for (let i = zzzs.length - 1; i >= 0; i--) {
+                zzzs[i].update();
+                zzzs[i].draw();
+                if (zzzs[i].life <= 0) zzzs.splice(i, 1);
+            }
+
             if (state === "sleep") {
                 let drawX = centerX;
                 let drawY = centerY;
 
                 if (dist(player.x, player.y, centerX, centerY) < 25) {
-                    if (monsterShakeTimer <= 0 && sndButukaru) {
-                        sndButukaru.play();
-                    }
+                    if (monsterShakeTimer <= 0 && sndButukaru) sndButukaru.play();
                     monsterShakeTimer = 75;
                     let angle = atan2(player.y - centerY, player.x - centerX);
                     player.vx = cos(angle) * 5;
@@ -197,6 +225,52 @@
                 player.update();
                 player.draw();
 
+                // 【追加】「おきて」と「ちゅう」が揃った時の特殊アニメーション処理
+                if (clearState === "okite_anim") {
+                    clearTimer++;
+                    for (let s of slots) {
+                        // 30フレーム(0.5秒)かけて透明度を0にする
+                        if (s.charObj) s.charObj.alpha = map(clearTimer, 0, 30, 255, 0);
+                    }
+                    if (clearTimer >= 30) {
+                        state = "wakeup"; // 完全に消えたら起きる
+                        wakeupTimer = 0;
+                        clearState = "done";
+                        if (sndKirakira) sndKirakira.play();
+                        for (let i = 0; i < 150; i++) {
+                            let p = new Particle(random(logicalW), random(logicalH), 'colorful'); 
+                            p.vx = random(-0.5, 0.5); p.vy = random(-0.5, 0.5); p.life = random(60, 120); 
+                            particles.push(p);
+                        }
+                    }
+                } 
+                else if (clearState === "chuu_anim") {
+                    clearTimer++;
+                    for (let s of slots) {
+                        if (s.charObj) {
+                            if (clearTimer <= 30) {
+                                // 前半：2倍に膨らみながら赤く染まる
+                                s.charObj.scale = map(clearTimer, 0, 30, 1.0, 2.0);
+                                s.charObj.color = lerpColor(color(255), color(255, 50, 50), clearTimer / 30.0);
+                            } else if (clearTimer <= 45) {
+                                // 後半：1.5倍に少し落ち着く（風船が張るような演出）
+                                s.charObj.scale = map(clearTimer, 30, 45, 2.0, 1.5);
+                            }
+                        }
+                    }
+                    if (clearTimer === 45) {
+                        if (sndKirakira) sndKirakira.play();
+                        for (let s of slots) {
+                            for (let i = 0; i < 30; i++) particles.push(new Particle(s.x, s.y, 'heart'));
+                            let idx = chars.indexOf(s.charObj);
+                            if (idx > -1) chars.splice(idx, 1);
+                            s.filled = false;
+                            s.charObj = null;
+                        }
+                        clearState = ""; // 消滅したら元に戻してプレイ続行
+                    }
+                }
+
                 for (let c of chars) {
                     c.update();
                     c.draw();
@@ -208,6 +282,13 @@
                 p.update();
                 p.draw();
                 if (p.life <= 0) particles.splice(i, 1);
+            }
+            pop();
+
+            if (fadeAlpha > 0) {
+                fill(0, 0, 0, fadeAlpha);
+                rect(0, 0, width, height);
+                fadeAlpha -= 5;
             }
         }
 
@@ -234,7 +315,7 @@
             player.targetY = realY;
 
             for (let i = 0; i < 5; i++) {
-                particles.push(new Particle(realX, realY, false));
+                particles.push(new Particle(realX, realY, 'white'));
             }
         }
 
@@ -243,22 +324,43 @@
             for (let s of slots) {
                 if (!s.filled) allFilled = false;
             }
-            if (allFilled) {
-                state = "wakeup";
-                wakeupTimer = 0;
-                if (sndKirakira) sndKirakira.play();
-
-                let logicalW = width / PIXEL_SCALE;
-                let logicalH = height / PIXEL_SCALE;
-                for (let i = 0; i < 150; i++) {
-                    let px = random(logicalW);
-                    let py = random(logicalH);
-                    let p = new Particle(px, py, true); 
-                    p.vx = random(-0.5, 0.5); 
-                    p.vy = random(-0.5, 0.5);
-                    p.life = random(60, 120); 
-                    particles.push(p);
+            
+            // 揃った瞬間に、どっちのルートのアニメーションを流すか決める
+            if (allFilled && clearState === "") {
+                let word = slots[0].charObj.char + slots[1].charObj.char + slots[2].charObj.char;
+                if (word === "おきて") {
+                    clearState = "okite_anim";
+                    clearTimer = 0;
+                } 
+                else if (word === "ちゅう") {
+                    clearState = "chuu_anim";
+                    clearTimer = 0;
                 }
+            }
+        }
+
+        // 【追加】Zzzクラス（角度をゆらゆらさせる）
+        class Zzz {
+            constructor(x, y) {
+                this.x = x; this.y = y;
+                this.life = 60; // 1秒で消える
+                this.baseX = x; // 揺れの中心点
+                this.offsetY = random(100);
+            }
+            update() {
+                this.y -= 0.3; // ゆっくり上に上がる
+                this.life--;
+            }
+            draw() {
+                let alpha = map(this.life, 0, 60, 0, 255);
+                fill(255, 255, 255, alpha);
+                textSize(12);
+                push();
+                let curX = this.baseX + sin(frameCount * 0.05 + this.offsetY) * 6; // 左右に揺れる
+                translate(curX, this.y);
+                rotate(sin(frameCount * 0.1) * 0.4); // 角度もゆらゆら揺れる
+                text("z", 0, 0); // 小文字のz
+                pop();
             }
         }
 
@@ -323,6 +425,14 @@
                 this.isLocked = false;
                 this.isReturning = false;
                 this.offsetY = random(100);
+                
+                // 【変更】無敵時間を30フレームに延長
+                this.ignorePlayerTimer = 0; 
+                
+                // 【追加】アニメーション用のパラメータ
+                this.scale = 1.0;
+                this.color = color(255);
+                this.alpha = 255;
             }
 
             update() {
@@ -345,27 +455,29 @@
                 let centerY = logicalH / 2;
 
                 if (dist(this.x, this.y, centerX, centerY) < 25 && state === "sleep") {
-                    if (monsterShakeTimer <= 0 && sndButukaru) {
-                        sndButukaru.play();
-                    }
+                    if (monsterShakeTimer <= 0 && sndButukaru) sndButukaru.play();
                     monsterShakeTimer = 75;
                     let angle = atan2(this.y - centerY, this.x - centerX);
                     this.vx = cos(angle) * 4;
                     this.vy = sin(angle) * 4;
                 }
 
-                let d = dist(player.x, player.y, this.x, this.y);
-                let minDist = 24;
-                if (d < minDist) {
-                    let angle = atan2(this.y - player.y, this.x - player.x);
-                    this.vx += cos(angle) * 1.5; 
-                    this.vy += sin(angle) * 1.5;
-                    this.isPushed = true;
-                } else {
+                if (this.ignorePlayerTimer > 0) {
+                    this.ignorePlayerTimer--;
                     this.isPushed = false;
+                } else {
+                    let d = dist(player.x, player.y, this.x, this.y);
+                    let minDist = 24;
+                    if (d < minDist) {
+                        let angle = atan2(this.y - player.y, this.x - player.x);
+                        this.vx += cos(angle) * 1.5; 
+                        this.vy += sin(angle) * 1.5;
+                        this.isPushed = true;
+                    } else {
+                        this.isPushed = false;
+                    }
                 }
 
-                // 【超重要】速度が爆発しないように安全装置をかける
                 this.vx = constrain(this.vx, -12, 12);
                 this.vy = constrain(this.vy, -12, 12);
 
@@ -375,45 +487,72 @@
                 this.vx *= 0.85;
                 this.vy *= 0.85;
 
-                // 【修正】跳ね返りパワーを安全な値（エネルギーが減衰する値）に変更
                 let margin = 12; 
-                let bouncePower = -0.8; 
+                let bounceForce = 5.0; 
+                let bounced = false;
 
                 if (this.x < margin) {
                     this.x = margin;
-                    this.vx *= bouncePower; 
+                    this.vx = bounceForce; 
+                    bounced = true;
                 } else if (this.x > logicalW - margin) {
                     this.x = logicalW - margin;
-                    this.vx *= bouncePower;
+                    this.vx = -bounceForce;
+                    bounced = true;
                 }
 
                 if (this.y < margin) {
                     this.y = margin;
-                    this.vy *= bouncePower;
+                    this.vy = bounceForce;
+                    bounced = true;
                 } else if (this.y > logicalH - margin) {
                     this.y = logicalH - margin;
-                    this.vy *= bouncePower;
+                    this.vy = -bounceForce;
+                    bounced = true;
                 }
 
-                // 【超重要】バウンド計算の後、絶対に画面外に出ないように最終ロックをかける
-                this.x = constrain(this.x, margin, logicalW - margin);
-                this.y = constrain(this.y, margin, logicalH - margin);
+                // 【変更】壁バウンド直後のすり抜け時間を30フレームに設定
+                if (bounced) {
+                    this.ignorePlayerTimer = 30;
+                }
 
-                for (let s of slots) {
-                    if (dist(this.x, this.y, s.x, s.y) < 10) {
-                        if (this.char === s.expected && !s.filled) {
+                // 【追加】丸に入るための「厳密な文字制限」の判定
+                let activePath = 0; // 0:両方OK、1:おきてルート、2:ちゅうルート
+                for (let i = 0; i < 3; i++) {
+                    if (slots[i].filled) {
+                        let c = slots[i].charObj.char;
+                        if (PATH_OKITE.includes(c)) activePath = 1;
+                        if (PATH_CHUU.includes(c)) activePath = 2;
+                    }
+                }
+
+                for (let i = 0; i < 3; i++) {
+                    let s = slots[i];
+                    if (dist(this.x, this.y, s.x, s.y) < 10 && !s.filled) {
+                        
+                        // このスロットに入っても良い文字かどうかのチェック
+                        let canEnter = false;
+                        if ((activePath === 0 || activePath === 1) && this.char === PATH_OKITE[i]) canEnter = true;
+                        if ((activePath === 0 || activePath === 2) && this.char === PATH_CHUU[i]) canEnter = true;
+
+                        if (canEnter) {
                             this.x = s.x; this.y = s.y;
                             this.vx = 0;
                             this.vy = 0;
                             this.isLocked = true;
+                            
                             s.filled = true;
+                            s.charObj = this; 
 
                             if (sndCorrect) sndCorrect.play();
 
-                            for (let i = 0; i < 15; i++) {
-                                particles.push(new Particle(s.x, s.y, true));
+                            // 【復活＆増加】入った瞬間のエフェクトパーティクルを30個に
+                            for (let p = 0; p < 30; p++) {
+                                particles.push(new Particle(s.x, s.y, 'colorful'));
                             }
+                            break; // 1つのスロットに入ったらループ終了
                         } else if (!this.isLocked && !this.isReturning) {
+                            // 入ってはいけない文字だった場合は弾き返す
                             this.isReturning = true;
                             if (sndIncorrect) sndIncorrect.play();
                         }
@@ -430,10 +569,19 @@
 
                 translate(this.x, drawY);
 
-                if (this.isReturning) fill(255, 50, 50);
-                else if (this.isPushed) fill(255, 255, 0);
-                else fill(255);
+                // アニメーション中の色の計算
+                if (this.isReturning) {
+                    fill(255, 50, 50, this.alpha);
+                } else if (this.isPushed) {
+                    fill(255, 255, 0, this.alpha);
+                } else {
+                    let r = red(this.color);
+                    let g = green(this.color);
+                    let b = blue(this.color);
+                    fill(r, g, b, this.alpha);
+                }
 
+                scale(this.scale); // ちゅう の風船アニメ用
                 noStroke();
                 textSize(14);
                 text(this.char, 0, 0);
@@ -442,15 +590,27 @@
         }
 
         class Particle {
-            constructor(x, y, colorful) {
+            constructor(x, y, type) {
                 this.x = x; this.y = y;
+                this.type = type;
                 let angle = random(TWO_PI);
-                let speed = random(0.5, 2.5);
-                this.vx = cos(angle) * speed;
-                this.vy = sin(angle) * speed;
-                this.life = 40;
-                if (colorful) {
+                
+                if (type === 'heart') {
+                    let speed = random(1.0, 3.0);
+                    this.vx = cos(angle) * speed;
+                    this.vy = sin(angle) * speed - 1.0; 
+                    this.life = 60;
+                } else {
+                    let speed = random(0.5, 2.5);
+                    this.vx = cos(angle) * speed;
+                    this.vy = sin(angle) * speed;
+                    this.life = 40;
+                }
+                
+                if (type === 'colorful') {
                     this.col = color(random(150, 255), random(150, 255), random(150, 255));
+                } else if (type === 'heart') {
+                    this.col = color(255, 50, 50); 
                 } else {
                     this.col = color(255);
                 }
@@ -460,8 +620,24 @@
                 this.life--;
             }
             draw() {
-                fill(this.col);
-                rect(this.x, this.y, 1, 1);
+                if (this.type === 'heart') {
+                    let alpha = map(this.life, 0, 60, 0, 255);
+                    fill(255, 50, 50, alpha);
+                    noStroke();
+                    push();
+                    translate(this.x, this.y);
+                    rect(-1, -1, 1, 1); rect(1, -1, 1, 1);
+                    rect(-2, 0, 5, 1);
+                    rect(-1, 1, 3, 1);
+                    rect(0, 2, 1, 1);
+                    pop();
+                } else {
+                    let alpha = map(this.life, 0, 40, 0, 255);
+                    let r = red(this.col), g = green(this.col), b = blue(this.col);
+                    fill(r, g, b, alpha);
+                    noStroke();
+                    rect(this.x, this.y, 1, 1);
+                }
             }
         }
 

@@ -30,6 +30,10 @@
         let isBgmStarted = false; 
         
         let camX = 0, camY = 0;
+        
+        // 【追加】フェードアウト用の変数
+        let isFadingOut = false;
+        let fadeAlpha = 0;
 
         function preload() {
             flowerImg = loadImage('flower.gif');
@@ -52,7 +56,6 @@
             noStroke();
             imageMode(CENTER);
 
-            // 【変更】SEの音量をさらに半分（0.25）に
             if (sndFlower) sndFlower.setVolume(0.25);
 
             if (playerImg) playerImg.pause();
@@ -113,6 +116,13 @@
 
         function draw() {
             background(0);
+            
+            // 操作可能状態の時のみ更新処理を行う
+            if (!isFadingOut) {
+                player.update();
+            }
+
+            push();
             scale(PIXEL_SCALE);
 
             let screenW = windowWidth / PIXEL_SCALE;
@@ -137,7 +147,6 @@
                 f.draw();
             }
 
-            player.update();
             player.draw();
 
             for (let i = particles.length - 1; i >= 0; i--) {
@@ -146,12 +155,31 @@
                 p.draw();
                 if (p.life <= 0) particles.splice(i, 1);
             }
+            pop();
+
+            // 【追加】フェードアウト処理（画面全体を黒で塗りつぶしていく）
+            if (isFadingOut) {
+                fadeAlpha += 5; 
+                fill(0, 0, 0, fadeAlpha);
+                rect(0, 0, width, height);
+
+                // 完全に真っ黒になったらページ移動
+                if (fadeAlpha >= 255) {
+                    if (bgm && bgm.isPlaying()) {
+                        sessionStorage.setItem('bgmTime', bgm.currentTime());
+                        bgm.stop(); 
+                    }
+                    window.location.href = 'monster.html';
+                }
+            }
         }
 
         function mousePressed() {
+            if (isFadingOut) return;
+
             if (bgm && !isBgmStarted) {
                 isBgmStarted = true;
-                bgm.setVolume(0.5); // BGMは0.5のまま維持
+                bgm.setVolume(0.5); 
                 bgm.loop();
             }
 
@@ -247,12 +275,9 @@
                     }
                     image(flowerImg, this.x, this.y);
 
-                    if (this.isPink && d < 10) {
-                        if (bgm && bgm.isPlaying()) {
-                            sessionStorage.setItem('bgmTime', bgm.currentTime());
-                            bgm.stop(); 
-                        }
-                        window.location.href = 'monster.html';
+                    // 【変更】いきなり移動するのではなく、フェードアウトフラグを立てる
+                    if (this.isPink && d < 10 && !isFadingOut) {
+                        isFadingOut = true;
                     }
                 } else {
                     this.isTouched = false; 
