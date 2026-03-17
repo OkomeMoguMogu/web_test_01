@@ -248,8 +248,9 @@
                 wakeupTimer = 0;
                 if (sndKirakira) sndKirakira.play();
 
-                let logicalW = width / PIXEL_SCALE;
-                let logicalH = height / PIXEL_SCALE;
+                // 【追加】スマホでも確実に出るキラキラエフェクト（パーティクルを150個散らす）
+                let logicalW = windowWidth / PIXEL_SCALE;
+                let logicalH = windowHeight / PIXEL_SCALE;
                 for (let i = 0; i < 150; i++) {
                     let px = random(logicalW);
                     let py = random(logicalH);
@@ -294,12 +295,6 @@
                         this.frameIdx = 0;
                     }
                 }
-
-                let logicalW = width / PIXEL_SCALE;
-                let logicalH = height / PIXEL_SCALE;
-                let margin = 8;
-                this.x = constrain(this.x, margin, logicalW - margin);
-                this.y = constrain(this.y, margin, logicalH - margin);
             }
 
             draw() {
@@ -344,63 +339,42 @@
                 let centerX = logicalW / 2;
                 let centerY = logicalH / 2;
 
+                // モンスターとの衝突
                 if (dist(this.x, this.y, centerX, centerY) < 25 && state === "sleep") {
                     if (monsterShakeTimer <= 0 && sndButukaru) {
                         sndButukaru.play();
                     }
                     monsterShakeTimer = 75;
                     let angle = atan2(this.y - centerY, this.x - centerX);
-                    this.vx = cos(angle) * 4;
-                    this.vy = sin(angle) * 4;
+                    this.vx = cos(angle) * 5;
+                    this.vy = sin(angle) * 5;
                 }
 
-                let d = dist(player.x, player.y, this.x, this.y);
-                let minDist = 24;
-                if (d < minDist) {
-                    let angle = atan2(this.y - player.y, this.x - player.x);
-                    this.vx += cos(angle) * 1.5; 
-                    this.vy += sin(angle) * 1.5;
-                    this.isPushed = true;
-                } else {
-                    this.isPushed = false;
+                if (abs(this.vx) > 0.1 || abs(this.vy) > 0.1) {
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    this.vx *= 0.85;
+                    this.vy *= 0.85;
                 }
+                else {
+                    let d = dist(player.x, player.y, this.x, this.y);
+                    let minDist = 24;
 
-                // 【追加】念のため最高速度を制限（安全装置）
-                this.vx = constrain(this.vx, -15, 15);
-                this.vy = constrain(this.vy, -15, 15);
-
-                this.x += this.vx;
-                this.y += this.vy;
-
-                this.vx *= 0.85;
-                this.vy *= 0.85;
-
-                // 【修正】跳ね返りパワーを安全な値（-0.8）に変更
-                let margin = 12; 
-                let bouncePower = -0.8; 
-
-                if (this.x < margin) {
-                    this.x = margin;
-                    this.vx *= bouncePower; 
-                } else if (this.x > logicalW - margin) {
-                    this.x = logicalW - margin;
-                    this.vx *= bouncePower;
-                }
-
-                if (this.y < margin) {
-                    this.y = margin;
-                    this.vy *= bouncePower;
-                } else if (this.y > logicalH - margin) {
-                    this.y = logicalH - margin;
-                    this.vy *= bouncePower;
+                    if (d < minDist) {
+                        let angle = atan2(this.y - player.y, this.x - player.x);
+                        let overlap = minDist - d;
+                        this.x += cos(angle) * overlap;
+                        this.y += sin(angle) * overlap;
+                        this.isPushed = true;
+                    } else {
+                        this.isPushed = false;
+                    }
                 }
 
                 for (let s of slots) {
                     if (dist(this.x, this.y, s.x, s.y) < 10) {
                         if (this.char === s.expected && !s.filled) {
                             this.x = s.x; this.y = s.y;
-                            this.vx = 0;
-                            this.vy = 0;
                             this.isLocked = true;
                             s.filled = true;
 
