@@ -4,118 +4,131 @@
     <meta charset="UTF-8">
     <title>My Game Portfolio</title>
     <style>
-        /* 1. 全体の設定（黒基調、ど真ん中に配置） */
-        body {
-            background-color: #111; /* 背景を黒に */
-            color: #fff; /* 文字を白に */
-            display: flex;
-            justify-content: center; /* 横方向の中心 */
-            align-items: center; /* 縦方向の中心 */
-            height: 100vh; /* 画面いっぱいの高さ */
-            margin: 0;
-            /* 丸っこくてかわいいフォントの指定 */
-            font-family: 'Zen Maru Gothic', 'Hiragino Maru Gothic ProN', 'M PLUS Rounded 1c', sans-serif;
-        }
-
-        h1 {
-            /* 連続クリックしても文字が青く選択されないようにする強力なおまじない */
-            -webkit-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
-            
-            font-size: 1.5em; /* 文字サイズを元の2/3くらいに縮小（デフォルトは約2em） */
-            letter-spacing: 5px; /* 文字の間を5px離す */
-        }
-
-        /* 1文字ずつの基本スタイル */
-        .char {
-            display: inline-block;
-            cursor: pointer;
-            position: relative; /* ひび割れ線を描くための基準位置 */
-            
-            /* 【重要】アニメーションの支点を「下の中央」にする */
-            /* これにより、足元は固定され、頭の方が大きく揺れるようになります */
-            transform-origin: bottom center; 
-        }
-
-        /* 2. 頭が揺れるぷるんとしたアニメーション（縦には伸び縮みしない） */
-        @keyframes wobble {
-            0%   { transform: skewX(0deg); }
-            20%  { transform: skewX(-15deg); } /* 左に傾く */
-            40%  { transform: skewX(10deg); }  /* 右に傾く */
-            60%  { transform: skewX(-5deg); }
-            80%  { transform: skewX(2deg); }
-            100% { transform: skewX(0deg); }   /* すぐに収束 */
-        }
-
-        /* クリック時に付与する揺れクラス */
-        .jelly-active {
-            animation: wobble 0.35s ease-out both; 
-        }
-
-        /* 3. 3回クリックされた時のひび割れクラス */
-        .cracked {
-            opacity: 0.7; /* 少し暗くする */
-            transform: rotate(-3deg) translate(1px, 2px); /* ガクッとずれた感じを出す */
-        }
-        
-        /* ひび割れの「線」をCSSで作るトリック */
-        .cracked::after {
-            content: "";
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            /* 背景と同じ黒色（#111）の斜め線を文字の上に引き、割れ目を表現 */
-            background: linear-gradient(70deg, transparent 40%, #111 45%, #111 55%, transparent 60%);
-            pointer-events: none; /* 線がマウスクリックを邪魔しないようにする */
-        }
+        body { margin: 0; padding: 0; background-color: #111; overflow: hidden; }
+        canvas { display: block; }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
 </head>
 <body>
-
-    <h1 id="target-text">ここをクリックして！</h1>
-
     <script>
-        const h1Element = document.getElementById('target-text');
-        const text = h1Element.textContent;
+        let playerImg;
+        let px = 50, py = 50; // キャラクターの現在位置
+        let pSize = 40; // マウスの当たり判定の半径
         
-        h1Element.innerHTML = '';
+        // ステート（状態）管理の変数
+        let isDragging = false;
+        let isFinished = false;
 
-        for (let i = 0; i < text.length; i++) {
-            const char = text[i];
-            
-            const span = document.createElement('span');
-            span.textContent = char;
-            span.className = 'char';
-            
-            // 【追加】この文字が何回クリックされたかを記憶する変数
-            let clickCount = 0;
+        function preload() {
+            // AsepriteからエクスポートしたGIFを読み込む
+            playerImg = loadImage('player.gif');
+        }
 
-            span.addEventListener('click', function() {
-                // すでにひび割れていたら、もう揺らさない（お好みで変更可）
-                if (this.classList.contains('cracked')) return;
+        function setup() {
+            createCanvas(windowWidth, windowHeight);
+            imageMode(CENTER);
+            textAlign(CENTER, CENTER);
+            textFont('sans-serif');
+        }
 
-                clickCount++; // クリック回数を1増やす
+        function draw() {
+            background(17);
 
-                if (clickCount >= 3) {
-                    // 3回クリックされたら：揺れを止めて、ひび割れクラスを付ける
-                    this.classList.remove('jelly-active');
-                    this.classList.add('cracked');
-                } else {
-                    // 1〜2回目のクリック：プルッと揺らす
-                    this.classList.remove('jelly-active');
-                    void this.offsetWidth; 
-                    this.classList.add('jelly-active');
+            let cx = width / 2;
+            let cy = height / 2;
+            let goalRadius = 150; // 黄色い輪の大きさ
+
+            // マウスとキャラクターの距離を計算（当たり判定）
+            let dToMouse = dist(mouseX, mouseY, px, py);
+            let isHovering = (dToMouse < pSize);
+
+            // ------------------------------------------------
+            // 1. 状態の更新（GameMakerのStepイベントに相当）
+            // ------------------------------------------------
+            if (!isFinished) {
+                // ゴール到達判定
+                if (dist(px, py, cx, cy) < goalRadius / 2) {
+                    isFinished = true;
                 }
-            });
 
-            span.addEventListener('animationend', function() {
-                this.classList.remove('jelly-active');
-            });
+                if (isDragging) {
+                    // 掴んでいる状態：マウスに追従
+                    px = mouseX;
+                    py = mouseY;
+                    playerImg.play(); // アニメーションを動かす
+                } else if (isHovering) {
+                    // 触っている（妨害）状態：動かない、アニメーション停止
+                    playerImg.pause();
+                } else {
+                    // 通常状態：画面中央へ向かって歩く
+                    playerImg.play();
+                    let speed = 2;
+                    // 中央へ向かう角度を計算して移動（lengthdir_x / y のような処理）
+                    let angle = atan2(cy - py, cx - px);
+                    px += cos(angle) * speed;
+                    py += sin(angle) * speed;
+                }
+            }
 
-            h1Element.appendChild(span);
+            // ------------------------------------------------
+            // 2. 描画（GameMakerのDrawイベントに相当）
+            // ------------------------------------------------
+            
+            // 常に画面中央に黄色い輪郭の丸を描画
+            noFill();
+            stroke(255, 255, 0);
+            strokeWeight(4);
+            circle(cx, cy, goalRadius);
+
+            // キャラクターの描画
+            noStroke();
+            if (isFinished) {
+                // ゴールした時：色は普通、中央に「おわり」
+                tint(255);
+                image(playerImg, px, py, playerImg.width, playerImg.height);
+                
+                fill(255);
+                noStroke();
+                textSize(48);
+                text("おわり", cx, cy);
+            } else {
+                if (isDragging) {
+                    // 掴んでいる時：元の色はそのまま、2倍に拡大、ジタバタ震える
+                    tint(255);
+                    let jitterX = random(-3, 3); // 暴れているような手触り
+                    let jitterY = random(-3, 3);
+                    image(playerImg, px + jitterX, py + jitterY, playerImg.width * 2, playerImg.height * 2);
+                } else if (isHovering) {
+                    // 触って妨害している時：赤色になる
+                    tint(255, 0, 0); // 赤色のフィルター
+                    image(playerImg, px, py, playerImg.width, playerImg.height);
+                } else {
+                    // 通常時
+                    tint(255); // 色フィルターなし（白）
+                    image(playerImg, px, py, playerImg.width, playerImg.height);
+                }
+            }
+        }
+
+        // ------------------------------------------------
+        // 3. マウス入力のイベント（Mouse Pressed / Released）
+        // ------------------------------------------------
+        function mousePressed() {
+            let d = dist(mouseX, mouseY, px, py);
+            // キャラクターの上にマウスがあり、まだ終わっていないなら掴む
+            if (d < pSize && !isFinished) {
+                isDragging = true;
+            }
+        }
+
+        function mouseReleased() {
+            // マウスを離したら掴み状態を解除
+            isDragging = false;
+        }
+
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
         }
     </script>
-
 </body>
 </html>
