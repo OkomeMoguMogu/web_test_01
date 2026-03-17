@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Scrollable Pixel Stars</title>
     <style>
-        body { margin: 0; padding: 0; background-color: #000; overflow: hidden; }
+        body { margin: 0; padding: 0; background-color: #000; overflow: hidden; touch-action: none;}
         canvas { display: block; }
+        
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/addons/p5.sound.min.js"></script>
@@ -40,7 +41,8 @@
 
         function setup() {
             createCanvas(windowWidth, windowHeight);
-            
+            // ↓ 【追加】スマホの「勝手に高画質化（巨大化）する機能」をオフにする
+            pixelDensity(1);
             noSmooth(); 
             noStroke();
             imageMode(CENTER);

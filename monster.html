@@ -6,7 +6,7 @@
     <title>Wake Up!</title>
     <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; padding: 0; background-color: #000; overflow: hidden; font-family: 'DotGothic16', sans-serif; }
+        body { margin: 0; padding: 0; background-color: #000; overflow: hidden; font-family: 'DotGothic16', sans-serif; touch-action: none;}
         canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
@@ -53,6 +53,8 @@
 
         function setup() {
             createCanvas(windowWidth, windowHeight);
+            // ↓ 【追加】スマホの「勝手に高画質化（巨大化）する機能」をオフにする
+            pixelDensity(1);
             noSmooth();
             imageMode(CENTER);
             textAlign(CENTER, CENTER);
