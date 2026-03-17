@@ -1,47 +1,57 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Scrollable Pixel Stars</title>
     <style>
-        body { margin: 0; padding: 0; background-color: #000; overflow: hidden; touch-action: none;}
-        canvas { display: block; }
-        
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        canvas {
+            display: block;
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/addons/p5.sound.min.js"></script>
 </head>
+
 <body>
     <script>
-        let PIXEL_SCALE = 4; 
-        const WORLD_MULT_X = 4; 
-        const WORLD_MULT_Y = 2; 
-        
+        let PIXEL_SCALE = 4;
+        const WORLD_MULT_X = 4;
+        const WORLD_MULT_Y = 2;
+
         let logicalWidth, logicalHeight;
         let stars = [];
-        let flowers = []; 
-        let particles = []; 
+        let flowers = [];
+        let particles = [];
         let flowerImg, playerImg;
-        let staticFlower; 
-        let player; 
-        
-        let bgm; 
-        let sndFlower; 
-        let isBgmStarted = false; 
-        
+        let staticFlower;
+        let player;
+
+        let bgm;
+        let sndFlower;
+        let isBgmStarted = false;
+
         let camX = 0, camY = 0;
 
         function preload() {
             flowerImg = loadImage('flower.gif');
             playerImg = loadImage('player.gif');
-            bgm = loadSound('kataomoi.mp3'); 
+            bgm = loadSound('kataomoi.mp3');
             sndFlower = loadSound('snd_flower.wav'); // 【修正】wavに変更
         }
 
         function setup() {
             createCanvas(windowWidth, windowHeight);
-            
+
             // Adjust PIXEL_SCALE for smartphone portrait mode
             if (windowWidth < 600) {
                 PIXEL_SCALE = 2;
@@ -51,16 +61,16 @@
 
             // ↓ 【追加】スマホの「勝手に高画質化（巨大化）する機能」をオフにする
             pixelDensity(1);
-            noSmooth(); 
+            noSmooth();
             noStroke();
             imageMode(CENTER);
 
             if (playerImg) playerImg.pause();
-            
+
             if (flowerImg) {
                 flowerImg.pause();
                 flowerImg.setFrame(0);
-                staticFlower = flowerImg.get(); 
+                staticFlower = flowerImg.get();
             }
 
             logicalWidth = ceil((windowWidth * WORLD_MULT_X) / PIXEL_SCALE);
@@ -76,15 +86,15 @@
 
         function generateStars() {
             stars = [];
-            let starCount = floor((logicalWidth * logicalHeight) / 240); 
-            let fadeStartX = logicalWidth * 0.5; 
-            let fadeEndX = logicalWidth * 0.9;   
+            let starCount = floor((logicalWidth * logicalHeight) / 240);
+            let fadeStartX = logicalWidth * 0.5;
+            let fadeEndX = logicalWidth * 0.9;
 
             for (let i = 0; i < starCount; i++) {
                 let sx = random(logicalWidth);
                 let sy = random(logicalHeight);
                 let prob = 1.0;
-                if (sx > fadeStartX) prob = map(sx, fadeStartX, fadeEndX, 1, 0); 
+                if (sx > fadeStartX) prob = map(sx, fadeStartX, fadeEndX, 1, 0);
                 if (random() < prob) stars.push(new Star(sx, sy));
             }
         }
@@ -98,11 +108,11 @@
 
             let startX = firstX + 50;
             let endX = logicalWidth - 100;
-            
+
             for (let x = startX; x < endX; x += random(20, 50)) {
                 let prob = map(x, startX, endX, 1.0, 0.05);
                 if (random() < prob) {
-                    let y = baseY + random(-80, 80); 
+                    let y = baseY + random(-80, 80);
                     flowers.push(new Flower(x, y, false));
                 }
             }
@@ -117,7 +127,7 @@
 
             let screenW = windowWidth / PIXEL_SCALE;
             let screenH = windowHeight / PIXEL_SCALE;
-            
+
             let targetCamX = (screenW / 2) - player.x;
             let targetCamY = (screenH / 2) - player.y;
 
@@ -157,7 +167,7 @@
 
             let realX = (mouseX / PIXEL_SCALE) - camX;
             let realY = (mouseY / PIXEL_SCALE) - camY;
-            
+
             player.targetX = realX;
             player.targetY = realY;
 
@@ -170,7 +180,7 @@
             constructor(x, y) {
                 this.x = x; this.y = y;
                 this.targetX = x; this.targetY = y;
-                this.speed = 1.5; 
+                this.speed = 1.5;
                 this.frameIdx = 0;
             }
 
@@ -208,14 +218,14 @@
                 let speed = random(0.5, 2.0);
                 this.vx = cos(angle) * speed;
                 this.vy = sin(angle) * speed;
-                this.life = 30; 
+                this.life = 30;
             }
             update() {
                 this.x += this.vx; this.y += this.vy;
                 this.life--;
             }
             draw() {
-                fill(255); 
+                fill(255);
                 rect(this.x, this.y, 1, 1);
             }
         }
@@ -224,14 +234,14 @@
             constructor(x, y, isPink) {
                 this.x = x; this.y = y;
                 this.isPink = isPink;
-                this.isTouched = false; 
+                this.isTouched = false;
             }
 
             draw() {
                 if (!flowerImg || !staticFlower) return;
 
                 let d = dist(player.x, player.y, this.x, this.y);
-                
+
                 if (this.isPink) tint(255, 100, 150);
                 else tint(255);
 
@@ -254,7 +264,7 @@
                         window.location.href = 'monster.html';
                     }
                 } else {
-                    this.isTouched = false; 
+                    this.isTouched = false;
                     image(staticFlower, this.x, this.y);
                 }
 
@@ -275,7 +285,7 @@
             }
             draw() {
                 if (this.brightness === 2) {
-                    fill(255); rect(floor(this.x), floor(this.y), 2, 2); 
+                    fill(255); rect(floor(this.x), floor(this.y), 2, 2);
                 } else if (this.brightness === 1) {
                     fill(120); rect(floor(this.x), floor(this.y), 1, 1);
                 }
@@ -296,4 +306,5 @@
         }
     </script>
 </body>
+
 </html>

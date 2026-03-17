@@ -214,6 +214,7 @@
         function mousePressed() {
             if (bgm && !isBgmStarted) {
                 isBgmStarted = true;
+                bgm.playMode('restart'); // Ensure it doesn't overlap old playback
                 bgm.setVolume(0.5);
                 bgm.loop();
 
@@ -425,6 +426,8 @@
                 PIXEL_SCALE = 4;
             }
             resizeCanvas(windowWidth, windowHeight);
+            pixelDensity(1);
+            noSmooth(); // MUST re-add after resize or context is lost!
         }
     </script>
 </body>
