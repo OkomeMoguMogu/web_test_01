@@ -15,7 +15,10 @@
 <body>
     <script>
         let PIXEL_SCALE = 4;
-        let imgSleep, imgWakeup, imgSleepMore, playerImg;
+        let imgSleep, imgWakeup, imgSleepMore, playerImg, flowerImg;
+
+        let imgKiss, sndKiss, reverbKiss;
+        let endingFlowers = [];
 
         let bgm;
         let isBgmStarted = false;
@@ -27,7 +30,7 @@
         let particles = [];
         let backgroundStars = [];
         let zzzs = []; 
-        let zzzTimer = 0; // zzzエフェクトの管理タイマー
+        let zzzTimer = 0; 
         
         let starAlpha = 0;
         let player;
@@ -39,13 +42,14 @@
         let sleepMoreTimer = 0;
         let owariAlpha = 0;
         
-        let fadeAlpha = 255; // 暗転からのフェードイン用
+        let fadeAlpha = 255; 
 
-        // 【追加】言葉が揃った時のアニメーション管理
         let clearState = ""; 
         let clearTimer = 0;
+        
+        // 【追加】ちゅうギミックが終わったかどうかを判定するフラグ
+        let chuuCompleted = false;
 
-        // 【追加】正解ルートの定義
         const PATH_OKITE = ['お', 'き', 'て'];
         const PATH_CHUU  = ['ち', 'ゅ', 'う'];
 
@@ -54,6 +58,7 @@
             imgWakeup = loadImage('monster_wakeup.gif');
             imgSleepMore = loadImage('monster_sleep_more.gif');
             playerImg = loadImage('player.gif');
+            flowerImg = loadImage('flower.gif'); 
 
             bgm = loadSound('kataomoi.mp3');
 
@@ -61,6 +66,9 @@
             sndCorrect = loadSound('snd_correct.wav');
             sndIncorrect = loadSound('snd_incorrect.wav');
             sndKirakira = loadSound('snd_kirakira.wav');
+            
+            imgKiss = loadImage('kiss.png');
+            sndKiss = loadSound('snd_kiss.wav');
         }
 
         function setup() {
@@ -82,6 +90,12 @@
             if (sndCorrect) sndCorrect.setVolume(0.25);
             if (sndIncorrect) sndIncorrect.setVolume(0.25);
             if (sndKirakira) sndKirakira.setVolume(0.25);
+            
+            if (sndKiss) {
+                reverbKiss = new p5.Reverb();
+                reverbKiss.process(sndKiss, 3, 2); 
+                sndKiss.setVolume(0.5);
+            }
 
             let logicalW = width / PIXEL_SCALE;
             let logicalH = height / PIXEL_SCALE;
@@ -112,6 +126,18 @@
 
             for (let i = 0; i < initialText.length; i++) {
                 chars.push(new PushableChar(initialText[i], charStartX + i * 16, charBaseY));
+            }
+        }
+        
+        function generateEndingFlowers() {
+            endingFlowers = [];
+            let logicalW = width / PIXEL_SCALE;
+            let logicalH = height / PIXEL_SCALE;
+            for (let i = 0; i < 25; i++) {
+                endingFlowers.push({
+                    x: random(logicalW),
+                    y: random(logicalH * 0.7, logicalH + 20),
+                });
             }
         }
 
@@ -150,14 +176,11 @@
                 }
             }
 
-            // 【変更】zのエフェクトを小文字にし、3回連続→全消滅→1秒待機 のサイクルにする
             if (state === "sleep" || state === "sleep_more") {
                 zzzTimer++;
-                // 20フレームごとに3回出す
                 if (zzzTimer === 20) zzzs.push(new Zzz(centerX + 15, centerY - 20));
                 if (zzzTimer === 40) zzzs.push(new Zzz(centerX + 25, centerY - 30));
                 if (zzzTimer === 60) zzzs.push(new Zzz(centerX + 35, centerY - 40));
-                // 3つ目の寿命(60f)が尽きるのが120フレーム目。そこから1秒(60f)待つので合計180でリセット
                 if (zzzTimer > 180) zzzTimer = 0; 
             }
 
@@ -206,10 +229,23 @@
                 if (wakeupTimer > 240) {
                     state = "sleep_more";
                     sleepMoreTimer = 0;
+                    
+                    if (flowerImg) flowerImg.play();
+                    generateEndingFlowers(); 
                 }
             }
             else if (state === "sleep_more") {
                 if (imgSleepMore) image(imgSleepMore, centerX, centerY);
+                
+                tint(255, starAlpha); 
+
+                for (let f of endingFlowers) {
+                    push();
+                    translate(f.x, f.y);
+                    if (flowerImg) image(flowerImg, 0, 0); 
+                    pop();
+                }
+                noTint(); 
 
                 sleepMoreTimer++;
                 if (sleepMoreTimer > 180) {
@@ -218,22 +254,21 @@
 
                 fill(255, 255, 255, owariAlpha);
                 textSize(20);
-                text("おわり", centerX, centerY - 40);
+                // 【変更】最後の文字を「おやすみ」に
+                text("おやすみ", centerX, centerY - 40);
             }
 
             if (state === "sleep") {
                 player.update();
                 player.draw();
 
-                // 【追加】「おきて」と「ちゅう」が揃った時の特殊アニメーション処理
                 if (clearState === "okite_anim") {
                     clearTimer++;
                     for (let s of slots) {
-                        // 30フレーム(0.5秒)かけて透明度を0にする
                         if (s.charObj) s.charObj.alpha = map(clearTimer, 0, 30, 255, 0);
                     }
                     if (clearTimer >= 30) {
-                        state = "wakeup"; // 完全に消えたら起きる
+                        state = "wakeup";
                         wakeupTimer = 0;
                         clearState = "done";
                         if (sndKirakira) sndKirakira.play();
@@ -246,28 +281,53 @@
                 } 
                 else if (clearState === "chuu_anim") {
                     clearTimer++;
-                    for (let s of slots) {
-                        if (s.charObj) {
-                            if (clearTimer <= 30) {
-                                // 前半：2倍に膨らみながら赤く染まる
-                                s.charObj.scale = map(clearTimer, 0, 30, 1.0, 2.0);
-                                s.charObj.color = lerpColor(color(255), color(255, 50, 50), clearTimer / 30.0);
-                            } else if (clearTimer <= 45) {
-                                // 後半：1.5倍に少し落ち着く（風船が張るような演出）
-                                s.charObj.scale = map(clearTimer, 30, 45, 2.0, 1.5);
+                    
+                    if (clearTimer <= 45) {
+                        for (let s of slots) {
+                            if (s.charObj) {
+                                if (clearTimer <= 30) {
+                                    s.charObj.scale = map(clearTimer, 0, 30, 1.0, 2.0);
+                                    s.charObj.color = lerpColor(color(255), color(255, 50, 50), clearTimer / 30.0);
+                                } else {
+                                    s.charObj.scale = map(clearTimer, 30, 45, 2.0, 1.5);
+                                }
                             }
                         }
                     }
-                    if (clearTimer === 45) {
-                        if (sndKirakira) sndKirakira.play();
-                        for (let s of slots) {
-                            for (let i = 0; i < 30; i++) particles.push(new Particle(s.x, s.y, 'heart'));
-                            let idx = chars.indexOf(s.charObj);
-                            if (idx > -1) chars.splice(idx, 1);
-                            s.filled = false;
-                            s.charObj = null;
+                    
+                    if (clearTimer >= 45) {
+                        // 【変更】45f〜85fの間、10フレームごとに計5回サウンドを再生
+                        if (clearTimer <= 85 && (clearTimer - 45) % 20 === 0) {
+                            if (sndKiss) sndKiss.play();
                         }
-                        clearState = ""; // 消滅したら元に戻してプレイ続行
+
+                        if (clearTimer === 45) {
+                            if (sndKirakira) sndKirakira.play();
+                            
+                            for (let s of slots) {
+                                // 【変更】ハートの量を1.5倍に（30 -> 45個）
+                                for (let i = 0; i < 45; i++) particles.push(new Particle(s.x, s.y, 'heart'));
+                                let idx = chars.indexOf(s.charObj);
+                                if (idx > -1) chars.splice(idx, 1);
+                                s.filled = false;
+                                s.charObj = null;
+                            }
+                        }
+
+                        let kissScale = map(clearTimer, 45, 90, 0.0, 6.0); 
+                        let kissAlpha = map(clearTimer, 70, 90, 255, 0); 
+                        push();
+                        let kissX = slots[1].x; 
+                        let kissY = slots[1].y;
+                        translate(kissX, kissY);
+                        scale(kissScale);
+                        tint(255, kissAlpha);
+                        if (imgKiss) image(imgKiss, 0, 0);
+                        pop();
+                    }
+                    
+                    if (clearTimer >= 90) {
+                        clearState = "";
                     }
                 }
 
@@ -325,7 +385,6 @@
                 if (!s.filled) allFilled = false;
             }
             
-            // 揃った瞬間に、どっちのルートのアニメーションを流すか決める
             if (allFilled && clearState === "") {
                 let word = slots[0].charObj.char + slots[1].charObj.char + slots[2].charObj.char;
                 if (word === "おきて") {
@@ -335,20 +394,21 @@
                 else if (word === "ちゅう") {
                     clearState = "chuu_anim";
                     clearTimer = 0;
+                    // 【追加】「ちゅう」が揃った瞬間にフラグを立てて、以後は「おきて」ルートしか受け付けないようにする
+                    chuuCompleted = true;
                 }
             }
         }
 
-        // 【追加】Zzzクラス（角度をゆらゆらさせる）
         class Zzz {
             constructor(x, y) {
                 this.x = x; this.y = y;
-                this.life = 60; // 1秒で消える
-                this.baseX = x; // 揺れの中心点
+                this.life = 60; 
+                this.baseX = x; 
                 this.offsetY = random(100);
             }
             update() {
-                this.y -= 0.3; // ゆっくり上に上がる
+                this.y -= 0.3; 
                 this.life--;
             }
             draw() {
@@ -356,10 +416,10 @@
                 fill(255, 255, 255, alpha);
                 textSize(12);
                 push();
-                let curX = this.baseX + sin(frameCount * 0.05 + this.offsetY) * 6; // 左右に揺れる
+                let curX = this.baseX + sin(frameCount * 0.05 + this.offsetY) * 6; 
                 translate(curX, this.y);
-                rotate(sin(frameCount * 0.1) * 0.4); // 角度もゆらゆら揺れる
-                text("z", 0, 0); // 小文字のz
+                rotate(sin(frameCount * 0.1) * 0.4); 
+                text("z", 0, 0); 
                 pop();
             }
         }
@@ -426,10 +486,8 @@
                 this.isReturning = false;
                 this.offsetY = random(100);
                 
-                // 【変更】無敵時間を30フレームに延長
                 this.ignorePlayerTimer = 0; 
                 
-                // 【追加】アニメーション用のパラメータ
                 this.scale = 1.0;
                 this.color = color(255);
                 this.alpha = 255;
@@ -511,18 +569,17 @@
                     bounced = true;
                 }
 
-                // 【変更】壁バウンド直後のすり抜け時間を30フレームに設定
                 if (bounced) {
                     this.ignorePlayerTimer = 30;
                 }
 
-                // 【追加】丸に入るための「厳密な文字制限」の判定
-                let activePath = 0; // 0:両方OK、1:おきてルート、2:ちゅうルート
+                let activePath = 0; 
                 for (let i = 0; i < 3; i++) {
                     if (slots[i].filled) {
                         let c = slots[i].charObj.char;
                         if (PATH_OKITE.includes(c)) activePath = 1;
-                        if (PATH_CHUU.includes(c)) activePath = 2;
+                        // 【変更】「ちゅう」完成後はちゅうルートを無効化
+                        if (!chuuCompleted && PATH_CHUU.includes(c)) activePath = 2;
                     }
                 }
 
@@ -530,10 +587,10 @@
                     let s = slots[i];
                     if (dist(this.x, this.y, s.x, s.y) < 10 && !s.filled) {
                         
-                        // このスロットに入っても良い文字かどうかのチェック
                         let canEnter = false;
                         if ((activePath === 0 || activePath === 1) && this.char === PATH_OKITE[i]) canEnter = true;
-                        if ((activePath === 0 || activePath === 2) && this.char === PATH_CHUU[i]) canEnter = true;
+                        // 【変更】「ちゅう」完成後はちゅうルートを無効化
+                        if (!chuuCompleted && (activePath === 0 || activePath === 2) && this.char === PATH_CHUU[i]) canEnter = true;
 
                         if (canEnter) {
                             this.x = s.x; this.y = s.y;
@@ -546,13 +603,11 @@
 
                             if (sndCorrect) sndCorrect.play();
 
-                            // 【復活＆増加】入った瞬間のエフェクトパーティクルを30個に
                             for (let p = 0; p < 30; p++) {
                                 particles.push(new Particle(s.x, s.y, 'colorful'));
                             }
-                            break; // 1つのスロットに入ったらループ終了
+                            break; 
                         } else if (!this.isLocked && !this.isReturning) {
-                            // 入ってはいけない文字だった場合は弾き返す
                             this.isReturning = true;
                             if (sndIncorrect) sndIncorrect.play();
                         }
@@ -569,7 +624,6 @@
 
                 translate(this.x, drawY);
 
-                // アニメーション中の色の計算
                 if (this.isReturning) {
                     fill(255, 50, 50, this.alpha);
                 } else if (this.isPushed) {
@@ -581,7 +635,7 @@
                     fill(r, g, b, this.alpha);
                 }
 
-                scale(this.scale); // ちゅう の風船アニメ用
+                scale(this.scale); 
                 noStroke();
                 textSize(14);
                 text(this.char, 0, 0);
@@ -642,14 +696,19 @@
         }
 
         function windowResized() {
+            createCanvas(windowWidth, windowHeight); 
             if (windowWidth < 600) {
                 PIXEL_SCALE = 2;
             } else {
                 PIXEL_SCALE = 4;
             }
-            resizeCanvas(windowWidth, windowHeight);
             pixelDensity(1);
-            noSmooth(); 
+            noSmooth();
+            
+            if (state === "sleep_more") {
+                if (flowerImg) flowerImg.play(); 
+                generateEndingFlowers();
+            }
         }
     </script>
 </body>
