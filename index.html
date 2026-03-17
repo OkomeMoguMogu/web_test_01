@@ -52,8 +52,8 @@
             noStroke();
             imageMode(CENTER);
 
-            // 【追加】SEの音量を半分にする
-            if (sndFlower) sndFlower.setVolume(0.5);
+            // 【変更】SEの音量をさらに半分（0.25）に
+            if (sndFlower) sndFlower.setVolume(0.25);
 
             if (playerImg) playerImg.pause();
             
@@ -151,7 +151,7 @@
         function mousePressed() {
             if (bgm && !isBgmStarted) {
                 isBgmStarted = true;
-                bgm.setVolume(0.5);
+                bgm.setVolume(0.5); // BGMは0.5のまま維持
                 bgm.loop();
             }
 
@@ -250,7 +250,6 @@
                     if (this.isPink && d < 10) {
                         if (bgm && bgm.isPlaying()) {
                             sessionStorage.setItem('bgmTime', bgm.currentTime());
-                            // 【修正】移動前に音を完全に止める（ゴーストオーディオ対策）
                             bgm.stop(); 
                         }
                         window.location.href = 'monster.html';
