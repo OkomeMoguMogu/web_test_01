@@ -4,34 +4,70 @@
     <meta charset="UTF-8">
     <title>My Game Portfolio</title>
     <style>
-        /* プリンのようなぷるんとしたアニメーションの定義 */
-        /* 横に潰れる → 縦に伸びる を繰り返し、徐々に1（元のサイズ）に収束させる */
-        @keyframes pudding {
-            0%   { transform: scale(1, 1); }
-            30%  { transform: scale(1.3, 0.7); }  /* 横にグシャッと潰れる */
-            40%  { transform: scale(0.7, 1.3); }  /* 反動で縦にビヨンと伸びる */
-            50%  { transform: scale(1.15, 0.85); }
-            65%  { transform: scale(0.95, 1.05); }
-            75%  { transform: scale(1.05, 0.95); }
-            100% { transform: scale(1, 1); }      /* 最後に自然にピタッと止まる */
+        /* 1. 全体の設定（黒基調、ど真ん中に配置） */
+        body {
+            background-color: #111; /* 背景を黒に */
+            color: #fff; /* 文字を白に */
+            display: flex;
+            justify-content: center; /* 横方向の中心 */
+            align-items: center; /* 縦方向の中心 */
+            height: 100vh; /* 画面いっぱいの高さ */
+            margin: 0;
+            /* 丸っこくてかわいいフォントの指定 */
+            font-family: 'Zen Maru Gothic', 'Hiragino Maru Gothic ProN', 'M PLUS Rounded 1c', sans-serif;
         }
 
         h1 {
-            user-select: none; /* テキスト選択されないようにする */
+            /* 連続クリックしても文字が青く選択されないようにする強力なおまじない */
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            
+            font-size: 1.5em; /* 文字サイズを元の2/3くらいに縮小（デフォルトは約2em） */
+            letter-spacing: 5px; /* 文字の間を5px離す */
         }
 
-        /* 1文字ずつ適用する基本スタイル */
+        /* 1文字ずつの基本スタイル */
         .char {
-            display: inline-block; /* Transform（変形）を効かせるために必須 */
+            display: inline-block;
             cursor: pointer;
-            transition: color 0.2s; /* 色が元に戻る時もフワッとさせる */
+            position: relative; /* ひび割れ線を描くための基準位置 */
+            
+            /* 【重要】アニメーションの支点を「下の中央」にする */
+            /* これにより、足元は固定され、頭の方が大きく揺れるようになります */
+            transform-origin: bottom center; 
         }
 
-        /* クリックした時に付与するクラス */
+        /* 2. 頭が揺れるぷるんとしたアニメーション（縦には伸び縮みしない） */
+        @keyframes wobble {
+            0%   { transform: skewX(0deg); }
+            20%  { transform: skewX(-15deg); } /* 左に傾く */
+            40%  { transform: skewX(10deg); }  /* 右に傾く */
+            60%  { transform: skewX(-5deg); }
+            80%  { transform: skewX(2deg); }
+            100% { transform: skewX(0deg); }   /* すぐに収束 */
+        }
+
+        /* クリック時に付与する揺れクラス */
         .jelly-active {
-            /* infiniteを外し、1回だけ再生（ease-outで徐々に勢いを落とす） */
-            animation: pudding 0.8s ease-out both; 
-            color: #ff0055;
+            animation: wobble 0.35s ease-out both; 
+        }
+
+        /* 3. 3回クリックされた時のひび割れクラス */
+        .cracked {
+            opacity: 0.7; /* 少し暗くする */
+            transform: rotate(-3deg) translate(1px, 2px); /* ガクッとずれた感じを出す */
+        }
+        
+        /* ひび割れの「線」をCSSで作るトリック */
+        .cracked::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            /* 背景と同じ黒色（#111）の斜め線を文字の上に引き、割れ目を表現 */
+            background: linear-gradient(70deg, transparent 40%, #111 45%, #111 55%, transparent 60%);
+            pointer-events: none; /* 線がマウスクリックを邪魔しないようにする */
         }
     </style>
 </head>
@@ -43,34 +79,40 @@
         const h1Element = document.getElementById('target-text');
         const text = h1Element.textContent;
         
-        // 1. 一旦h1の中身を空にする
         h1Element.innerHTML = '';
 
-        // 2. 文字列を1文字ずつ分解して処理する
         for (let i = 0; i < text.length; i++) {
             const char = text[i];
             
-            // 1文字を囲むための <span> タグを作る
             const span = document.createElement('span');
             span.textContent = char;
-            span.className = 'char'; // CSSで定義した .char を付ける
+            span.className = 'char';
+            
+            // 【追加】この文字が何回クリックされたかを記憶する変数
+            let clickCount = 0;
 
-            // 3. クリックされた時の処理
             span.addEventListener('click', function() {
-                // 連打しても最初からアニメーションが再生されるようにするテクニック
-                this.classList.remove('jelly-active');
-                void this.offsetWidth; // ブラウザのアニメーション状態をリセットする魔法の1行
-                
-                // アニメーションクラスを付ける（これでプルンと動く）
-                this.classList.add('jelly-active');
+                // すでにひび割れていたら、もう揺らさない（お好みで変更可）
+                if (this.classList.contains('cracked')) return;
+
+                clickCount++; // クリック回数を1増やす
+
+                if (clickCount >= 3) {
+                    // 3回クリックされたら：揺れを止めて、ひび割れクラスを付ける
+                    this.classList.remove('jelly-active');
+                    this.classList.add('cracked');
+                } else {
+                    // 1〜2回目のクリック：プルッと揺らす
+                    this.classList.remove('jelly-active');
+                    void this.offsetWidth; 
+                    this.classList.add('jelly-active');
+                }
             });
 
-            // 4. アニメーションが完全に終わった時の処理（状態を元に戻す）
             span.addEventListener('animationend', function() {
                 this.classList.remove('jelly-active');
             });
 
-            // h1の中に、作った <span> を追加していく
             h1Element.appendChild(span);
         }
     </script>
