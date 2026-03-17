@@ -63,7 +63,6 @@
             textAlign(CENTER, CENTER);
             textFont('DotGothic16');
 
-            // 【変更】WAVの音量をさらに半分（0.25）に
             if (sndButukaru) sndButukaru.setVolume(0.25);
             if (sndCorrect) sndCorrect.setVolume(0.25);
             if (sndIncorrect) sndIncorrect.setVolume(0.25);
@@ -164,8 +163,14 @@
                 if (imgWakeup) image(imgWakeup, 0, 0);
                 pop();
 
+                if (wakeupTimer < 60) {
+                    for (let i = 0; i < 40; i++) {
+                        fill(random(100, 255), random(100, 255), random(100, 255));
+                        rect(random(logicalW), random(logicalH), 2, 2);
+                    }
+                }
+
                 wakeupTimer++;
-                // 【変更】起きてる時間をさらに2秒延長（120フレームから240フレームへ）
                 if (wakeupTimer > 240) {
                     state = "sleep_more";
                     sleepMoreTimer = 0;
@@ -206,13 +211,15 @@
             if (bgm && !isBgmStarted) {
                 isBgmStarted = true;
                 bgm.playMode('restart');
-                bgm.setVolume(0.5); // BGMは0.5のまま
-                bgm.loop();
-
+                bgm.setVolume(0.5); 
+                
                 let savedTime = sessionStorage.getItem('bgmTime');
                 if (savedTime) {
+                    bgm.loop();
                     bgm.jump(parseFloat(savedTime));
                     sessionStorage.removeItem('bgmTime');
+                } else {
+                    bgm.loop();
                 }
             }
 
@@ -237,16 +244,15 @@
                 wakeupTimer = 0;
                 if (sndKirakira) sndKirakira.play();
 
-                // 【追加】スマホでも確実に出るキラキラエフェクト（パーティクルを150個散らす）
                 let logicalW = windowWidth / PIXEL_SCALE;
                 let logicalH = windowHeight / PIXEL_SCALE;
                 for (let i = 0; i < 150; i++) {
                     let px = random(logicalW);
                     let py = random(logicalH);
-                    let p = new Particle(px, py, true); // カラフルモードで生成
-                    p.vx = random(-0.5, 0.5); // フワフワ漂うようにする
+                    let p = new Particle(px, py, true); 
+                    p.vx = random(-0.5, 0.5); 
                     p.vy = random(-0.5, 0.5);
-                    p.life = random(60, 120); // 1〜2秒かけて消える
+                    p.life = random(60, 120); 
                     particles.push(p);
                 }
             }
@@ -284,6 +290,12 @@
                         this.frameIdx = 0;
                     }
                 }
+
+                let logicalW = windowWidth / PIXEL_SCALE;
+                let logicalH = windowHeight / PIXEL_SCALE;
+                let margin = 8;
+                this.x = constrain(this.x, margin, logicalW - margin);
+                this.y = constrain(this.y, margin, logicalH - margin);
             }
 
             draw() {
@@ -328,41 +340,65 @@
                 let centerX = logicalW / 2;
                 let centerY = logicalH / 2;
 
+                // モンスターとの衝突
                 if (dist(this.x, this.y, centerX, centerY) < 25 && state === "sleep") {
                     if (monsterShakeTimer <= 0 && sndButukaru) {
                         sndButukaru.play();
                     }
                     monsterShakeTimer = 75;
                     let angle = atan2(this.y - centerY, this.x - centerX);
-                    this.vx = cos(angle) * 4;
-                    this.vy = sin(angle) * 4;
+                    this.vx = cos(angle) * 5;
+                    this.vy = sin(angle) * 5;
                 }
 
-                if (abs(this.vx) > 0.1 || abs(this.vy) > 0.1) {
-                    this.x += this.vx;
-                    this.y += this.vy;
-                    this.vx *= 0.85;
-                    this.vy *= 0.85;
-                }
-                else {
-                    let d = dist(player.x, player.y, this.x, this.y);
-                    let minDist = 24;
-
-                    if (d < minDist) {
-                        let angle = atan2(this.y - player.y, this.x - player.x);
-                        let overlap = minDist - d;
-                        this.x += cos(angle) * overlap;
-                        this.y += sin(angle) * overlap;
-                        this.isPushed = true;
-                    } else {
-                        this.isPushed = false;
-                    }
+                // 【修正】プレイヤーからの体当たり（ドリブルのように速度が加算される）
+                let d = dist(player.x, player.y, this.x, this.y);
+                let minDist = 24;
+                if (d < minDist) {
+                    let angle = atan2(this.y - player.y, this.x - player.x);
+                    this.vx += cos(angle) * 1.5; // 速度を加える
+                    this.vy += sin(angle) * 1.5;
+                    this.isPushed = true;
+                } else {
+                    this.isPushed = false;
                 }
 
+                // 速度を実際の座標に適用
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // 摩擦で減速
+                this.vx *= 0.85;
+                this.vy *= 0.85;
+
+                // 【修正】壁でのバウンド処理
+                let margin = 12; // 文字の厚み
+                let bouncePower = -1.2; // -1.0より大きくするとボヨ〜ンと少し弾む
+
+                if (this.x < margin) {
+                    this.x = margin;
+                    this.vx *= bouncePower; // 勢いを反転して跳ね返す
+                } else if (this.x > logicalW - margin) {
+                    this.x = logicalW - margin;
+                    this.vx *= bouncePower;
+                }
+
+                if (this.y < margin) {
+                    this.y = margin;
+                    this.vy *= bouncePower;
+                } else if (this.y > logicalH - margin) {
+                    this.y = logicalH - margin;
+                    this.vy *= bouncePower;
+                }
+
+                // スロットとの吸着判定
                 for (let s of slots) {
                     if (dist(this.x, this.y, s.x, s.y) < 10) {
                         if (this.char === s.expected && !s.filled) {
                             this.x = s.x; this.y = s.y;
+                            // 吸着したら速度をゼロにしてロック
+                            this.vx = 0;
+                            this.vy = 0;
                             this.isLocked = true;
                             s.filled = true;
 
